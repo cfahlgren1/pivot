@@ -1,7 +1,8 @@
 """Serves the simulated sidecar over HTTP so the web UI can run in a plain browser.
 
 GET /events streams every sidecar line as server-sent events; POST /send writes one request line.
-Used by shoot.mjs to take README screenshots without the Tauri shell.
+Used by shoot.mjs to take README screenshots without the Tauri shell. The simulated boards are shown with
+the names real SO-101 boards get on macOS, so screenshots match what users see.
 """
 
 import subprocess
@@ -12,6 +13,21 @@ from pathlib import Path
 
 SIDECAR = Path(__file__).resolve().parents[2] / "sidecar"
 PORT = 1430
+
+# Simulated name -> what a real board shows. Requests from the UI are mapped back.
+REAL_NAMES = {
+    "/dev/tty.fake-claw-arm": "/dev/tty.usbmodem5A7A0185481",
+    "/dev/tty.fake-handle-arm": "/dev/tty.usbmodem5A7A0187091",
+    "Simulated claw arm": "USB Single Serial",
+    "Simulated handle arm": "USB Single Serial",
+}
+
+
+def rename(text: str, names: dict[str, str]) -> str:
+    for old, new in names.items():
+        text = text.replace(old, new)
+    return text
+
 
 sidecar = subprocess.Popen(
     ["uv", "run", "--quiet", "--project", str(SIDECAR), "pivot-sidecar", "--fake", *sys.argv[1:]],
@@ -27,7 +43,7 @@ arrived = threading.Condition()
 def pump() -> None:
     for line in sidecar.stdout:
         with arrived:
-            lines.append(line.rstrip("\n"))
+            lines.append(rename(line.rstrip("\n"), REAL_NAMES))
             arrived.notify_all()
 
 
@@ -46,7 +62,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         body = self.rfile.read(int(self.headers["Content-Length"])).decode()
-        sidecar.stdin.write(body.strip() + "\n")
+        ports_back = {real: fake for fake, real in REAL_NAMES.items() if fake.startswith("/dev/")}
+        sidecar.stdin.write(rename(body.strip(), ports_back) + "\n")
         sidecar.stdin.flush()
         self.send_response(204)
         self.cors()

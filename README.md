@@ -10,7 +10,7 @@
 
 <br>
 
-<img src="docs/screenshots/6-teleop.png" alt="Pivot teleoperating a simulated SO-101 arm">
+<img src="docs/screenshots/5-calibrate.png" alt="Pivot calibrating an SO-101 arm: rings fill as each joint is swept">
 
 </div>
 
@@ -21,12 +21,16 @@ LeRobot expects it, so `lerobot-record`, `lerobot-teleoperate` and training pick
 
 <table>
   <tr>
+    <td width="50%"><img src="docs/screenshots/1-welcome.png" alt=""><br><b>Start.</b> One instruction and one button per screen. Back is always one click (or <kbd>⌘</kbd><kbd>[</kbd>) away.</td>
     <td width="50%"><img src="docs/screenshots/2-connect.png" alt=""><br><b>1. Plug in.</b> Pivot finds both boards on its own. No port names to copy.</td>
-    <td width="50%"><img src="docs/screenshots/3-power.png" alt=""><br><b>2. Power check.</b> Pings all 12 motors and reads their voltage, so a loose barrel plug shows up here, not halfway through calibration.</td>
   </tr>
   <tr>
+    <td><img src="docs/screenshots/3-power.png" alt=""><br><b>2. Power check.</b> Pings all 12 motors and reads their voltage, so a loose barrel plug shows up here, not halfway through calibration.</td>
     <td><img src="docs/screenshots/4-identify.png" alt=""><br><b>3. Which arm is which.</b> Wiggle the claw arm and Pivot watches which board moves. No unplug test to get backwards.</td>
+  </tr>
+  <tr>
     <td><img src="docs/screenshots/5-calibrate.png" alt=""><br><b>4–5. Calibrate.</b> Rings fill as you sweep each joint. Saving waits until every joint has covered its range.</td>
+    <td><img src="docs/screenshots/6-teleop.png" alt=""><br><b>6. Teleoperate.</b> The claw arm eases into the handle arm's pose, then follows it.</td>
   </tr>
 </table>
 
