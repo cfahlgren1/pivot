@@ -14,3 +14,7 @@ app/src-tauri/target/
 app/src-tauri/gen/
 
 .DS_Store
+
+# Release builds
+dist/
+sidecar/build/

@@ -33,14 +33,27 @@ fn find_uv() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("uv"))
 }
 
-/// Dev builds run the sidecar from the repo with uv. `PIVOT_SIDECAR_ARGS="--fake"` simulates arms.
-fn sidecar_command() -> Command {
-    let project = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../sidecar");
-    let mut command = Command::new(find_uv());
-    command
-        .args(["run", "--quiet", "--project"])
-        .arg(project)
-        .arg("pivot-sidecar");
+/// Release builds ship a frozen sidecar in the app's resources (see scripts/build-mac.sh).
+/// Dev builds run it from the repo with uv. `PIVOT_SIDECAR_ARGS="--fake"` simulates arms.
+fn sidecar_command(app: &AppHandle) -> Command {
+    let bundled = app
+        .path()
+        .resource_dir()
+        .map(|dir| dir.join("pivot-sidecar").join("pivot-sidecar"))
+        .ok()
+        .filter(|path| path.is_file());
+    let mut command = match bundled {
+        Some(path) => Command::new(path),
+        None => {
+            let project = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../sidecar");
+            let mut command = Command::new(find_uv());
+            command
+                .args(["run", "--quiet", "--project"])
+                .arg(project)
+                .arg("pivot-sidecar");
+            command
+        }
+    };
     if let Ok(extra) = std::env::var("PIVOT_SIDECAR_ARGS") {
         command.args(extra.split_whitespace());
     }
@@ -48,7 +61,9 @@ fn sidecar_command() -> Command {
 }
 
 fn start_sidecar(app: &AppHandle) -> Result<(), String> {
-    let mut child = sidecar_command()
+    let mut command = sidecar_command(app);
+    eprintln!("Starting sidecar: {:?}", command.get_program());
+    let mut child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())

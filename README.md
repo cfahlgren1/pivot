@@ -19,6 +19,14 @@ expects them, so `lerobot-record`, `lerobot-teleoperate` and training use them u
 | The follower snaps to the leader's pose when teleoperation starts. | Eases into the pose over a second. |
 | One missed read ends teleoperation. | Retries, then reconnects, before giving up. |
 
+## Install
+
+Download the `.dmg` from [Releases](https://github.com/cfahlgren1/pivot/releases), open it and drag
+Pivot to Applications. Apple Silicon Macs only for now.
+
+The app isn't notarized yet, so macOS blocks the first launch. Right-click Pivot → **Open** → **Open**.
+If macOS says the app is damaged, run `xattr -dr com.apple.quarantine /Applications/Pivot.app`.
+
 ## Layout
 
 ```
@@ -50,6 +58,12 @@ PIVOT_SIDECAR_ARGS="--fake --scenario leader_unpowered" pnpm tauri dev
 pnpm tauri dev
 ```
 
+Build a self-contained `Pivot.app` and `.dmg` (Python and LeRobot bundled) into `dist/`:
+
+```sh
+./scripts/build-mac.sh
+```
+
 The sidecar can also be driven by hand:
 
 ```sh
@@ -62,4 +76,4 @@ echo '{"id":1,"method":"list_boards"}' | uv run pivot-sidecar --fake
 Prototype. Works end to end against simulated arms; hardware testing is in progress.
 
 Not yet: setting motor IDs on new motors (use `lerobot-setup-motors`), automatic calibration
-for the claw arm, cameras and recording, packaged builds that bundle Python.
+for the claw arm, cameras and recording, notarized builds, Windows and Linux builds.
