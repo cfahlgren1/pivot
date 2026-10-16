@@ -1,0 +1,944 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pivot · SO-101 setup mockups</title>
+<style>
+  :root {
+    --ink: #1d1d1f;
+    --ink-2: #6e6e73;
+    --ink-3: #aeaeb2;
+    --hair: rgba(0, 0, 0, 0.08);
+    --paper: #ffffff;
+    --mist: #f5f5f7;
+    --canvas: #dcdce2;
+    --blue: #0071e3;
+    --green: #30d158;
+    --amber: #ff9f0a;
+    --red: #ff3b30;
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: var(--sans);
+    color: var(--ink);
+    background: var(--canvas);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid rgba(0, 113, 227, 0.5); outline-offset: 2px; }
+  svg.i { width: 1em; height: 1em; display: block; flex: none; }
+
+  /* ───────── canvas ───────── */
+  #viewport {
+    position: fixed; inset: 0;
+    background-color: var(--canvas);
+    background-image: radial-gradient(rgba(0, 0, 0, 0.13) 1px, transparent 1.2px);
+    background-size: 22px 22px;
+    cursor: grab;
+    touch-action: none;
+  }
+  #viewport.dragging { cursor: grabbing; }
+  #world {
+    position: absolute; left: 0; top: 0;
+    transform-origin: 0 0;
+    display: grid;
+    grid-template-columns: repeat(2, 1280px);
+    gap: 200px 160px;
+    padding: 160px;
+  }
+  .board { position: relative; }
+  .board-label { position: absolute; top: -84px; left: 2px; white-space: nowrap; }
+  .board-label b { display: block; font: 600 30px/1 var(--display); letter-spacing: -0.022em; margin-bottom: 10px; }
+  .board-label span { font-size: 17px; color: var(--ink-2); }
+
+  #index {
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 2px;
+    padding: 6px;
+    background: rgba(250, 250, 252, 0.72);
+    backdrop-filter: blur(30px) saturate(1.8);
+    -webkit-backdrop-filter: blur(30px) saturate(1.8);
+    border-radius: 18px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16), 0 0 0 0.5px rgba(0, 0, 0, 0.14), inset 0 0.5px 0 rgba(255, 255, 255, 0.8);
+    z-index: 10;
+    white-space: nowrap;
+  }
+  #index .brand { font-weight: 600; font-size: 13px; padding: 0 12px 0 10px; display: flex; align-items: center; gap: 8px; }
+  #index button {
+    border: 0; background: transparent; cursor: pointer;
+    font-size: 13px; padding: 8px 12px; border-radius: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  #index button:hover { background: rgba(0, 0, 0, 0.06); }
+  #index button.on { background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.08); }
+  #index kbd { font: 500 11px var(--mono); color: var(--ink-2); background: rgba(0, 0, 0, 0.06); border-radius: 5px; padding: 1px 6px; }
+  #index .sep { width: 1px; height: 22px; background: var(--hair); margin: 0 4px; }
+  #zoom-readout { font: 500 12px var(--mono); color: var(--ink-2); min-width: 48px; text-align: center; }
+
+  /* ───────── mac window ───────── */
+  .win {
+    width: 1280px; height: 800px;
+    border-radius: 16px;
+    overflow: hidden;
+    background: var(--paper);
+    box-shadow:
+      0 50px 120px rgba(0, 0, 0, 0.22),
+      0 18px 40px rgba(0, 0, 0, 0.10),
+      0 0 0 0.5px rgba(0, 0, 0, 0.28),
+      inset 0 0.5px 0 rgba(255, 255, 255, 0.7);
+    position: relative;
+    display: flex; flex-direction: column;
+  }
+  .titlebar { height: 56px; flex: none; display: flex; align-items: center; padding: 0 20px; position: relative; gap: 12px; }
+  .lights { display: flex; gap: 8px; }
+  .lights i { width: 12px; height: 12px; border-radius: 50%; display: block; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.18); }
+  .lights i:nth-child(1) { background: #ff5f57; }
+  .lights i:nth-child(2) { background: #febc2e; }
+  .lights i:nth-child(3) { background: #28c840; }
+  .titlebar .title { position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; font-weight: 600; color: var(--ink-2); pointer-events: none; }
+
+  .btn {
+    border: 0; cursor: pointer;
+    font-size: 13px; font-weight: 500;
+    padding: 6px 14px; border-radius: 7px;
+    background: #fff;
+    box-shadow: 0 0.5px 1.5px rgba(0, 0, 0, 0.2), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+  }
+  .btn.primary { background: linear-gradient(#2a8bf2, #0a72e6); color: #fff; box-shadow: 0 0.5px 1.5px rgba(0, 60, 140, 0.4), inset 0 0.5px 0 rgba(255, 255, 255, 0.25); }
+  .btn.primary[aria-disabled="true"] { background: #e8e8ed; color: var(--ink-3); box-shadow: none; cursor: default; }
+  .btn.big { font-size: 15px; padding: 11px 24px; border-radius: 12px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+  .glow-green { background: var(--green); box-shadow: 0 0 0 3px rgba(48, 209, 88, 0.2); }
+  .glow-red { background: var(--red); box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.2); }
+  .stage-3d { display: block; width: 100%; height: 100%; }
+  .no-gl { height: 100%; display: grid; place-items: center; padding: 32px; text-align: center; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+  .meta { font: 12px var(--mono); color: var(--ink-2); letter-spacing: -0.01em; }
+
+  /* ───────── 1 · checklist ───────── */
+  .v1 { flex-direction: row; }
+  .v1 .side {
+    width: 280px; flex: none;
+    background: linear-gradient(180deg, rgba(236, 236, 241, 0.96), rgba(230, 230, 236, 0.96));
+    border-right: 0.5px solid rgba(0, 0, 0, 0.12);
+    display: flex; flex-direction: column;
+  }
+  .v1 .side .app { display: flex; align-items: center; gap: 12px; padding: 4px 22px 20px; }
+  .v1 .side .app .icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: linear-gradient(160deg, #ffffff, #e4e4ea);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), inset 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+    display: grid; place-items: center; font-size: 22px; color: #1d1d1f;
+  }
+  .v1 .side .app b { font-size: 15px; display: block; }
+  .v1 .side .app small { font-size: 12px; color: var(--ink-2); }
+  .v1 .side h5 { margin: 0; padding: 4px 24px 6px; font-size: 11px; font-weight: 600; color: var(--ink-2); }
+  .v1 .side nav { padding: 0 12px; display: flex; flex-direction: column; gap: 1px; }
+  .v1 .step { display: flex; align-items: center; gap: 11px; padding: 8px 12px; border-radius: 8px; font-size: 13px; }
+  .v1 .step small { margin-left: auto; color: var(--ink-2); font-size: 11px; }
+  .v1 .step.on { background: rgba(0, 0, 0, 0.07); font-weight: 600; }
+  .v1 .step .i { font-size: 18px; }
+  .v1 .step .done { color: var(--green); }
+  .v1 .step .now { color: var(--blue); }
+  .v1 .step .todo { color: var(--ink-3); }
+  .v1 .side .foot { margin: auto 16px 16px; padding: 14px; border-radius: 12px; background: rgba(255, 255, 255, 0.6); font-size: 12px; color: var(--ink-2); line-height: 1.45; display: flex; gap: 10px; }
+  .v1 .side .foot .i { font-size: 16px; color: var(--green); }
+  .v1 main { flex: 1; display: flex; flex-direction: column; padding: 0 56px 36px; min-width: 0; }
+  .v1 h1 { font: 700 34px/1.12 var(--display); letter-spacing: -0.025em; margin: 18px 0 10px; }
+  .v1 .lede { font-size: 16px; color: var(--ink-2); margin: 0 0 28px; max-width: 560px; line-height: 1.45; }
+  .v1 .boards { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  .v1 .card { border-radius: 18px; background: var(--mist); position: relative; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04); }
+  .v1 .card.live { background: linear-gradient(180deg, #eef5ff, #f6f9ff); box-shadow: inset 0 0 0 1.5px rgba(0, 113, 227, 0.45); }
+  .v1 .card .view { height: 290px; }
+  .v1 .card .tag { position: absolute; top: 16px; right: 16px; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 99px; display: flex; align-items: center; gap: 6px; }
+  .v1 .card .tag.move { background: var(--blue); color: #fff; }
+  .v1 .card .tag.still { background: rgba(0, 0, 0, 0.06); color: var(--ink-2); }
+  .v1 .card .info { padding: 0 20px 18px; }
+  .v1 .card h3 { margin: 0 0 3px; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .v1 .bars { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 14px; }
+  .v1 .bars div { height: 34px; border-radius: 6px; background: rgba(0, 0, 0, 0.05); position: relative; overflow: hidden; }
+  .v1 .bars i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--ink-3); border-radius: 6px 6px 0 0; }
+  .v1 .card.live .bars i { background: var(--blue); }
+  .v1 .actions { margin-top: auto; display: flex; justify-content: space-between; align-items: center; }
+  .v1 .actions p { margin: 0; font-size: 13px; color: var(--ink-2); }
+
+  /* ───────── 2 · one step ───────── */
+  .v2 { background: radial-gradient(120% 90% at 30% 40%, #ffffff 0%, #f2f3f6 70%); }
+  .v2 .progress { position: absolute; left: 50%; top: 22px; transform: translateX(-50%); display: flex; gap: 6px; }
+  .v2 .progress i { width: 32px; height: 4px; border-radius: 2px; background: rgba(0, 0, 0, 0.1); display: block; }
+  .v2 .progress i.done { background: var(--ink); }
+  .v2 .progress i.now { background: var(--blue); }
+  .v2 .stage { flex: 1; display: grid; grid-template-columns: 700px 1fr; align-items: center; padding-right: 72px; min-height: 0; }
+  .v2 .view { height: 700px; margin-top: -40px; }
+  .v2 .eyebrow { font-size: 14px; font-weight: 600; color: var(--blue); margin: 0 0 14px; }
+  .v2 h1 { font: 700 56px/1.02 var(--display); letter-spacing: -0.035em; margin: 0 0 20px; }
+  .v2 .lede { font-size: 18px; line-height: 1.45; color: var(--ink-2); margin: 0 0 30px; }
+  .v2 .checks { list-style: none; padding: 0; margin: 0 0 36px; border-radius: 16px; background: rgba(255, 255, 255, 0.8); box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.1), 0 4px 20px rgba(0, 0, 0, 0.04); }
+  .v2 .checks li { display: flex; align-items: center; gap: 12px; font-size: 15px; padding: 13px 18px; }
+  .v2 .checks li + li { border-top: 0.5px solid var(--hair); }
+  .v2 .checks .i { font-size: 18px; }
+  .v2 .checks em { font-style: normal; margin-left: auto; font: 13px var(--mono); color: var(--ink-2); }
+  .v2 .checks .ok { color: var(--green); }
+  .v2 .checks .off { color: var(--amber); }
+  .v2 .checks li.warn em { color: #b26a00; }
+  .v2 .row { display: flex; gap: 14px; align-items: center; }
+  .v2 .row span { font-size: 14px; color: var(--ink-2); }
+  .v2 .legend3d { position: absolute; left: 48px; bottom: 36px; display: flex; gap: 18px; font-size: 12px; color: var(--ink-2); }
+  .v2 .legend3d span { display: flex; align-items: center; gap: 7px; }
+
+  /* ───────── 3 · range rings ───────── */
+  .v3 .body { flex: 1; display: grid; grid-template-columns: 1fr 520px; min-height: 0; }
+  .v3 .left { position: relative; background: radial-gradient(100% 80% at 50% 60%, #ffffff, #f1f2f5); }
+  .v3 .left .view { position: absolute; top: 150px; bottom: 120px; left: 0; right: 0; }
+  .v3 .left .head { position: absolute; top: 0; left: 0; right: 0; padding: 0 36px; }
+  .v3 h1 { font: 700 30px/1.15 var(--display); letter-spacing: -0.025em; margin: 6px 0 8px; }
+  .v3 .lede { font-size: 15px; color: var(--ink-2); margin: 0; line-height: 1.45; max-width: 460px; }
+  .v3 .hint {
+    position: absolute; left: 36px; right: 36px; bottom: 32px;
+    border-radius: 14px; padding: 16px 18px;
+    background: rgba(255, 249, 238, 0.92);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 0 0 0.5px rgba(178, 106, 0, 0.25);
+    color: #6e4200; font-size: 14px; line-height: 1.45;
+    display: flex; gap: 12px;
+  }
+  .v3 .hint .i { font-size: 20px; color: var(--amber); margin-top: 1px; }
+  .v3 .right { border-left: 0.5px solid var(--hair); display: flex; flex-direction: column; align-items: center; padding: 36px 48px 32px; background: #fff; }
+  .v3 .ringwrap { position: relative; width: 300px; height: 300px; }
+  .v3 .total { margin-top: 18px; text-align: center; }
+  .v3 .total b { font: 700 40px/1 var(--display); letter-spacing: -0.03em; display: block; }
+  .v3 .total small { font-size: 13px; color: var(--ink-2); }
+  .v3 .legend { list-style: none; padding: 0; margin: 18px 0 0; width: 100%; display: grid; }
+  .v3 .legend li { display: grid; grid-template-columns: 14px 1fr 64px 48px; align-items: center; gap: 12px; font-size: 14px; padding: 10px 2px; }
+  .v3 .legend li + li { border-top: 0.5px solid var(--hair); }
+  .v3 .legend .mini { height: 4px; border-radius: 2px; background: rgba(0, 0, 0, 0.07); overflow: hidden; }
+  .v3 .legend .mini i { display: block; height: 100%; border-radius: 2px; }
+  .v3 .legend b { font: 600 13px var(--mono); text-align: right; }
+  .v3 .legend .low b { color: #c47400; }
+  .v3 .right .btn { margin-top: auto; align-self: stretch; }
+
+  /* ───────── 4 · doctor ───────── */
+  .v4 { background: #f5f5f7; }
+  .v4 .titlebar { position: absolute; top: 0; left: 0; right: 0; z-index: 2; }
+  .v4 .body { flex: 1; display: grid; grid-template-columns: 1fr 470px; min-height: 0; }
+  .v4 .left { position: relative; }
+  .v4 .left .view { position: absolute; inset: 0; }
+  .v4 .seg { position: absolute; top: 64px; left: 36px; display: flex; padding: 3px; border-radius: 9px; background: rgba(0, 0, 0, 0.06); font-size: 13px; }
+  .v4 .seg > span { padding: 5px 14px; border-radius: 7px; display: flex; align-items: center; gap: 7px; }
+  .v4 .seg > span.on { background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); font-weight: 500; }
+  .v4 .chip {
+    position: absolute; transform: translate(-50%, -130%);
+    padding: 6px 10px 6px 8px; border-radius: 10px;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+    font-size: 12px; white-space: nowrap; display: flex; align-items: center; gap: 7px;
+    pointer-events: none;
+  }
+  .v4 .chip .meta { font-size: 11px; }
+  .v4 .chip::after { content: ""; position: absolute; left: 50%; bottom: -14px; width: 1px; height: 14px; background: rgba(0, 0, 0, 0.25); }
+  .v4 .right { background: #fff; border-left: 0.5px solid var(--hair); padding: 68px 32px 28px; display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+  .v4 h1 { font: 700 30px/1.1 var(--display); letter-spacing: -0.025em; margin: 0; }
+  .v4 .lede { font-size: 15px; color: var(--ink-2); margin: -6px 0 6px; }
+  .v4 .issue { border-radius: 16px; background: #fff3f2; padding: 18px; box-shadow: inset 0 0 0 0.5px rgba(255, 59, 48, 0.3); }
+  .v4 .issue header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .v4 .issue header .i { font-size: 20px; color: var(--red); }
+  .v4 .issue b { font-size: 15px; color: #a3170e; }
+  .v4 .issue p { margin: 0 0 14px; font-size: 14px; line-height: 1.5; color: #4f1a14; }
+  .v4 .board-art { border-radius: 12px; background: #fff; padding: 12px; box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08); margin-bottom: 14px; }
+  .v4 .row { display: flex; gap: 10px; }
+  .v4 .card { border-radius: 14px; padding: 14px 16px; box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.1); display: flex; gap: 12px; align-items: flex-start; font-size: 13px; line-height: 1.45; color: var(--ink-2); }
+  .v4 .card .i { font-size: 18px; margin-top: 1px; }
+  .v4 .card strong { display: block; color: var(--ink); font-weight: 600; font-size: 14px; margin-bottom: 2px; }
+  .v4 .card code { font: 12px var(--mono); color: var(--ink); background: var(--mist); padding: 1px 5px; border-radius: 4px; }
+  .v4 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: auto; }
+  .v4 .stats div { border-radius: 12px; background: var(--mist); padding: 12px 14px; }
+  .v4 .stats b { display: block; font: 600 22px/1.1 var(--display); letter-spacing: -0.02em; }
+  .v4 .stats small { font-size: 12px; color: var(--ink-2); }
+
+  /* ───────── 5 · menu bar ───────── */
+  .v5 {
+    background:
+      radial-gradient(70% 60% at 18% 20%, #4c62a8 0%, transparent 60%),
+      radial-gradient(60% 70% at 85% 85%, #8a4a7a 0%, transparent 62%),
+      radial-gradient(50% 50% at 60% 30%, #2d7a8c 0%, transparent 60%),
+      #151722;
+    color: #f5f5f7;
+  }
+  .v5 .menubar {
+    height: 32px; flex: none; display: flex; align-items: center; gap: 20px; padding: 0 16px;
+    font-size: 13px; background: rgba(20, 20, 28, 0.35);
+    backdrop-filter: blur(30px) saturate(1.6); -webkit-backdrop-filter: blur(30px) saturate(1.6);
+  }
+  .v5 .menubar .right { margin-left: auto; display: flex; gap: 18px; align-items: center; color: rgba(255, 255, 255, 0.9); }
+  .v5 .menubar .extra { display: flex; align-items: center; gap: 7px; padding: 3px 9px; border-radius: 6px; background: rgba(255, 255, 255, 0.2); }
+  .v5 .pop {
+    position: absolute; top: 40px; right: 150px; width: 380px;
+    border-radius: 16px; padding: 14px;
+    background: rgba(44, 44, 54, 0.68);
+    backdrop-filter: blur(40px) saturate(1.9); -webkit-backdrop-filter: blur(40px) saturate(1.9);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 0 0 0.5px rgba(255, 255, 255, 0.2);
+  }
+  .v5 .pop h4 { margin: 2px 6px 12px; font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+  .v5 .pop h4 span { color: rgba(255, 255, 255, 0.55); font-weight: 400; font-family: var(--mono); font-size: 12px; }
+  .v5 .tile { background: rgba(255, 255, 255, 0.08); border-radius: 12px; margin-bottom: 8px; box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.08); }
+  .v5 .tile.viewtile { height: 230px; position: relative; overflow: hidden; }
+  .v5 .tile.viewtile .over { position: absolute; left: 12px; bottom: 10px; font-size: 11px; color: rgba(255, 255, 255, 0.6); display: flex; gap: 12px; }
+  .v5 .tile.row { display: flex; align-items: center; gap: 12px; font-size: 13px; padding: 11px 12px; }
+  .v5 .tile .sub { font-size: 11px; color: rgba(255, 255, 255, 0.55); margin-top: 2px; }
+  .v5 .switch { margin-left: auto; width: 40px; height: 24px; border-radius: 12px; background: var(--green); position: relative; flex: none; }
+  .v5 .switch::after { content: ""; position: absolute; right: 2px; top: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); }
+  .v5 .menu { border-top: 0.5px solid rgba(255, 255, 255, 0.15); margin-top: 6px; padding-top: 6px; }
+  .v5 .menu div { padding: 6px 10px; font-size: 13px; border-radius: 7px; display: flex; justify-content: space-between; }
+  .v5 .menu div.hl { background: var(--blue); }
+  .v5 .menu kbd { font: 13px var(--sans); color: rgba(255, 255, 255, 0.5); }
+  .v5 .menu div.hl kbd { color: rgba(255, 255, 255, 0.85); }
+  .v5 .hud {
+    position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 18px;
+    padding: 12px 12px 12px 22px; border-radius: 99px;
+    background: rgba(24, 24, 32, 0.55);
+    backdrop-filter: blur(30px) saturate(1.6); -webkit-backdrop-filter: blur(30px) saturate(1.6);
+    box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.2), 0 20px 50px rgba(0, 0, 0, 0.45);
+    font-size: 14px;
+  }
+  .v5 .hud .wave { display: flex; gap: 3px; align-items: center; height: 22px; }
+  .v5 .hud .wave i { width: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.8); display: block; }
+  .v5 .hud .stat { font: 13px var(--mono); color: rgba(255, 255, 255, 0.7); }
+  .v5 .hud .stop { border: 0; border-radius: 99px; padding: 9px 18px; background: var(--red); color: #fff; font-weight: 600; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+  .v5 .hud .stop i { width: 10px; height: 10px; border-radius: 2px; background: #fff; display: block; }
+  .v5 .widget {
+    position: absolute; left: 48px; top: 72px; width: 300px;
+    border-radius: 22px; padding: 18px 20px;
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(30px) saturate(1.5); -webkit-backdrop-filter: blur(30px) saturate(1.5);
+    box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.22);
+  }
+  .v5 .widget small { font-size: 12px; color: rgba(255, 255, 255, 0.65); }
+  .v5 .widget b { display: block; font: 700 44px/1.05 var(--display); letter-spacing: -0.03em; margin: 6px 0 2px; }
+  .v5 .widget .spark { display: flex; gap: 4px; align-items: flex-end; height: 40px; margin-top: 12px; }
+  .v5 .widget .spark i { flex: 1; border-radius: 3px; background: rgba(255, 255, 255, 0.55); display: block; }
+  .v5 .widget .spark i.today { background: #fff; }
+
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+  .pulse { animation: pulse 1.6s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+
+<!-- SF Symbols–style icons -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M7.5 12.3l3 3 6-6.6" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-now" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="4.6" fill="currentColor"/></symbol>
+  <symbol id="i-todo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.2" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M13 5.5l-5 7.2h3.6L10.8 18.5l5.2-7.3h-3.6z" fill="#fff"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M10.3 3.6a2 2 0 013.4 0l8 13.9A2 2 0 0120 20.5H4a2 2 0 01-1.7-3z" fill="currentColor"/><path d="M12 9v4.6" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="16.9" r="1.3" fill="#fff"/></symbol>
+  <symbol id="i-wand" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M8 16l7-7" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M15.5 6.5v2M14.5 7.5h2M8 7v1.6M7.2 7.8h1.6M16.4 13.2v1.6M15.6 14h1.6" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/></symbol>
+  <symbol id="i-arrows" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M12 6.5v11M9 9l3-3 3 3M9 15l3 3 3-3" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-arm" viewBox="0 0 24 24"><path d="M5 20h9M8 20v-4l2-8 7 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10" cy="8" r="1.8" fill="currentColor"/><path d="M17 11l3-2M17 11l2.6 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><circle cx="12" cy="7.6" r="1.3" fill="#fff"/><path d="M12 11v6" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></symbol>
+</svg>
+
+<div id="viewport">
+  <div id="world">
+
+    <!-- ═════ 1 · Checklist ═════ -->
+    <section class="board" id="b1">
+      <div class="board-label"><b>Checklist</b><span>A System Settings–style sidebar. The app tells the two arms apart by watching which one you move.</span></div>
+      <div class="win v1">
+        <aside class="side">
+          <div class="titlebar"><div class="lights"><i></i><i></i><i></i></div></div>
+          <div class="app"><div class="icon"><svg class="i"><use href="#i-arm"/></svg></div><div><b>Pivot</b><small>SO-101 · 2 arms</small></div></div>
+          <h5>Setup</h5>
+          <nav>
+            <div class="step"><svg class="i done"><use href="#i-check"/></svg>Connect boards<small>2 found</small></div>
+            <div class="step on"><svg class="i now"><use href="#i-now"/></svg>Name your arms</div>
+            <div class="step"><svg class="i done"><use href="#i-check"/></svg>Motor IDs<small>Already set</small></div>
+            <div class="step"><svg class="i todo"><use href="#i-todo"/></svg>Calibrate claw arm</div>
+            <div class="step"><svg class="i todo"><use href="#i-todo"/></svg>Calibrate handle arm</div>
+            <div class="step"><svg class="i todo"><use href="#i-todo"/></svg>Try it out</div>
+          </nav>
+          <h5 style="margin-top:18px">Later</h5>
+          <nav>
+            <div class="step"><svg class="i todo"><use href="#i-todo"/></svg>Cameras</div>
+            <div class="step"><svg class="i todo"><use href="#i-todo"/></svg>Record demonstrations</div>
+          </nav>
+          <div class="foot"><svg class="i"><use href="#i-wand"/></svg><span>All 12 motors already had their IDs, so that step was skipped.</span></div>
+        </aside>
+        <main>
+          <div class="titlebar" style="padding:0"></div>
+          <h1>Which arm is which?</h1>
+          <p class="lede">Gently move the arm with the claw. Whichever board responds becomes the claw arm.</p>
+          <div class="boards">
+            <div class="card live">
+              <span class="tag move"><span class="dot pulse" style="background:#fff;width:6px;height:6px"></span>Moving</span>
+              <div class="view"><canvas class="stage-3d" id="c1a"></canvas></div>
+              <div class="info">
+                <h3>Claw arm</h3>
+                <div class="meta">usbmodem5C821105801 · 6 motors · 12.2 V</div>
+                <div class="bars" id="bars-live"></div>
+              </div>
+            </div>
+            <div class="card">
+              <span class="tag still">Still</span>
+              <div class="view"><canvas class="stage-3d" id="c1b"></canvas></div>
+              <div class="info">
+                <h3 style="color:var(--ink-2)">Handle arm</h3>
+                <div class="meta">usbmodem5C821069151 · 6 motors · 12.3 V</div>
+                <div class="bars" id="bars-still"></div>
+              </div>
+            </div>
+          </div>
+          <div class="actions" style="margin-top:24px">
+            <p>Got it backwards? Swap them.</p>
+            <div style="display:flex;gap:10px"><button class="btn">Swap</button><button class="btn primary">Continue</button></div>
+          </div>
+        </main>
+      </div>
+    </section>
+
+    <!-- ═════ 2 · One step ═════ -->
+    <section class="board" id="b2">
+      <div class="board-label"><b>One step at a time</b><span>One instruction and one button. The blue ghost shows the pose to match; the solid arm is yours, live.</span></div>
+      <div class="win v2">
+        <div class="titlebar">
+          <div class="lights"><i></i><i></i><i></i></div>
+          <div class="progress" aria-label="Step 4 of 7"><i class="done"></i><i class="done"></i><i class="done"></i><i class="now"></i><i></i><i></i><i></i></div>
+        </div>
+        <div class="stage">
+          <div class="view"><canvas class="stage-3d" id="c2"></canvas></div>
+          <div>
+            <p class="eyebrow">Calibrate claw arm</p>
+            <h1>Hold it<br>like this.</h1>
+            <p class="lede">Match the blue outline. You’ll be able to save once every joint lines up.</p>
+            <ul class="checks">
+              <li><svg class="i ok"><use href="#i-check"/></svg>Base facing forward<em>0°</em></li>
+              <li><svg class="i ok"><use href="#i-check"/></svg>Upper arm straight up<em>2°</em></li>
+              <li class="warn"><svg class="i off"><use href="#i-arrows"/></svg>Forearm level<em id="v2-fore">11° low</em></li>
+              <li><svg class="i ok"><use href="#i-check"/></svg>Claw half open<em>48%</em></li>
+            </ul>
+            <div class="row"><button class="btn primary big" aria-disabled="true">Save middle position</button><span>Raise the forearm a little.</span></div>
+          </div>
+        </div>
+        <div class="legend3d"><span><span class="dot" style="background:#4d9bff"></span>Target pose</span><span><span class="dot" style="background:#1d1d1f"></span>Your arm</span></div>
+      </div>
+    </section>
+
+    <!-- ═════ 3 · Range rings ═════ -->
+    <section class="board" id="b3">
+      <div class="board-label"><b>Range rings</b><span>Each joint fills its ring as you sweep it. You can’t save until every joint has been moved end to end.</span></div>
+      <div class="win v3">
+        <div class="body">
+          <div class="left">
+            <div class="view"><canvas class="stage-3d" id="c3"></canvas></div>
+            <div class="head">
+              <div class="titlebar" style="padding:0"><div class="lights"><i></i><i></i><i></i></div></div>
+              <h1>Move every joint end to end.</h1>
+              <p class="lede">Slowly, until each one stops. Wrist roll turns all the way around, so it’s skipped.</p>
+            </div>
+            <div class="hint"><svg class="i"><use href="#i-arrows"/></svg><span><b>Upper arm is only at 22%.</b> Tilt the tall upright section all the way forward, then all the way back. Support the forearm while you do.</span></div>
+          </div>
+          <div class="right">
+            <div class="ringwrap">
+              <svg viewBox="0 0 340 340" width="300" height="300" id="rings"></svg>
+              </div>
+            <div class="total"><b id="ring-total">0%</b><small>of the full range covered</small></div>
+            <ul class="legend" id="ring-legend"></ul>
+            <button class="btn primary big" aria-disabled="true">Save calibration</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═════ 4 · Doctor ═════ -->
+    <section class="board" id="b4">
+      <div class="board-label"><b>Doctor</b><span>Every motor at a glance. Problems come with the fix, not an error code.</span></div>
+      <div class="win v4">
+        <div class="titlebar"><div class="lights"><i></i><i></i><i></i></div><div class="title">Pivot — Doctor</div></div>
+        <div class="body">
+          <div class="left">
+            <div class="view"><canvas class="stage-3d" id="c4"></canvas></div>
+            <div class="seg"><span class="on"><span class="dot glow-green"></span>Claw arm</span><span><span class="dot glow-red"></span>Handle arm</span></div>
+            <div id="chips"></div>
+          </div>
+          <div class="right">
+            <h1>One thing to fix</h1>
+            <p class="lede">6 of 12 motors are responding.</p>
+            <div class="issue">
+              <header><svg class="i"><use href="#i-bolt"/></svg><b>Handle arm has no motor power</b></header>
+              <p>Its board is connected over USB, but the motors aren’t getting power. Push the barrel plug into the handle arm’s board until it’s fully seated. The red <b style="font-size:inherit;color:inherit">PW</b> light only means USB is connected.</p>
+              <div class="board-art">
+                <svg viewBox="0 0 380 132" width="100%" aria-label="Board diagram with the barrel jack highlighted" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+                  <path d="M22 62 V20 H40" fill="none" stroke="#ff3b30" stroke-width="1.5"/>
+                  <text x="46" y="24" fill="#ff3b30" font-size="13" font-weight="600">Barrel plug — push in until seated</text>
+                  <rect x="80" y="38" width="240" height="90" rx="8" fill="#1d1d1f"/>
+                  <text x="96" y="58" fill="#8e8e93" font-size="11">BusLinker V3.0</text>
+                  <rect x="262" y="96" width="42" height="20" rx="3" fill="#f5f5f7"/>
+                  <rect x="262" y="70" width="42" height="20" rx="3" fill="#f5f5f7" opacity="0.45"/>
+                  <circle cx="104" cy="110" r="4" fill="#ff3b30"/><text x="114" y="114" fill="#8e8e93" font-size="10">PW</text>
+                  <rect x="48" y="66" width="52" height="32" rx="6" fill="#3a3a3c"/>
+                  <rect x="6" y="74" width="40" height="16" rx="8" fill="#ffffff" stroke="#ff3b30" stroke-width="2" stroke-dasharray="4 3"/>
+                </svg>
+              </div>
+              <div class="row"><button class="btn primary">Check again</button><button class="btn">It’s plugged in</button></div>
+            </div>
+            <div class="card"><svg class="i" style="color:var(--blue)"><use href="#i-wand"/></svg><div><strong>Trigger range fixed</strong>The closed reading <code>839</code> was a glitch, so it was replaced with the measured value <code>2035</code>. The claw now closes fully. <a href="#" style="color:var(--blue);text-decoration:none">Undo</a></div></div>
+            <div class="stats">
+              <div><b>12.2 V</b><small>Supply</small></div>
+              <div><b>47°</b><small>Hottest motor</small></div>
+              <div><b>60 Hz</b><small>Update rate</small></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═════ 5 · Menu bar ═════ -->
+    <section class="board" id="b5">
+      <div class="board-label"><b>Menu bar</b><span>After setup, the app gets out of the way. Teleoperation and recording live in the menu bar.</span></div>
+      <div class="win v5">
+        <div class="menubar">
+          <svg class="i" viewBox="0 0 24 24" style="font-size:15px"><path fill="currentColor" d="M16.4 12.6c0-2.4 2-3.5 2-3.6-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.2-2.8.8-3.5.8s-1.8-.8-3-.8C6.9 7.3 5.4 8.2 4.6 9.7c-1.7 2.9-.4 7.2 1.2 9.6.8 1.2 1.7 2.4 3 2.4 1.2 0 1.6-.8 3-.8s1.8.8 3 .8c1.3 0 2.1-1.2 2.9-2.3.9-1.3 1.3-2.6 1.3-2.7 0 0-2.6-1-2.6-4.1zM14.2 5.6c.6-.8 1.1-1.9 1-3-.9 0-2.1.6-2.7 1.4-.6.7-1.1 1.8-1 2.9 1 .1 2.1-.5 2.7-1.3z"/></svg>
+          <b>Finder</b><span>File</span><span>Edit</span><span>View</span><span>Go</span><span>Window</span>
+          <div class="right">
+            <span class="extra"><span class="dot glow-green" style="width:7px;height:7px"></span>Pivot</span>
+            <span>Wed Oct 15&nbsp;&nbsp;6:12 PM</span>
+          </div>
+        </div>
+        <div class="widget">
+          <small>Demonstrations today</small>
+          <b>27 / 30</b>
+          <small>Task: “pick up the red block”</small>
+          <div class="spark"><i style="height:40%"></i><i style="height:65%"></i><i style="height:30%"></i><i style="height:80%"></i><i style="height:55%"></i><i style="height:70%"></i><i class="today" style="height:95%"></i></div>
+        </div>
+        <div class="pop">
+          <h4>Pivot <span>60 Hz · 12.2 V</span></h4>
+          <div class="tile viewtile"><canvas class="stage-3d" id="c5"></canvas><div class="over"><span>Claw arm, live</span></div></div>
+          <div class="tile row"><span class="dot glow-green"></span><div>Claw follows handle<div class="sub">Both arms connected</div></div><span class="switch" role="switch" aria-checked="true"></span></div>
+          <div class="menu">
+            <div class="hl">Record demonstration<kbd>⌘R</kbd></div>
+            <div>Relax both arms<kbd>⌘.</kbd></div>
+            <div>Run Doctor…</div>
+            <div>Recalibrate…</div>
+          </div>
+        </div>
+        <div class="hud">
+          <span class="dot pulse" style="background:var(--red);width:10px;height:10px"></span>
+          <span>Recording 28 of 30</span>
+          <span class="wave" id="wave"></span>
+          <span class="stat" id="rec-time">0:12</span>
+          <button class="stop"><i></i>Stop</button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<nav id="index" aria-label="Variations">
+  <span class="brand"><svg class="i" style="font-size:16px"><use href="#i-arm"/></svg>Pivot</span>
+  <button data-go="b1"><kbd>1</kbd>Checklist</button>
+  <button data-go="b2"><kbd>2</kbd>One step</button>
+  <button data-go="b3"><kbd>3</kbd>Range rings</button>
+  <button data-go="b4"><kbd>4</kbd>Doctor</button>
+  <button data-go="b5"><kbd>5</kbd>Menu bar</button>
+  <span class="sep"></span>
+  <button id="zoom-out" aria-label="Zoom out">−</button>
+  <span id="zoom-readout">100%</span>
+  <button id="zoom-in" aria-label="Zoom in">+</button>
+  <button id="fit"><kbd>0</kbd>All</button>
+</nav>
+
+<script type="module">
+import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const rad = THREE.MathUtils.degToRad;
+
+/* ═════════ canvas pan / zoom ═════════ */
+const viewport = document.getElementById("viewport");
+const world = document.getElementById("world");
+const readout = document.getElementById("zoom-readout");
+const view = { x: 0, y: 0, s: 1 };
+
+function apply() {
+  world.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.s})`;
+  readout.textContent = Math.round(view.s * 100) + "%";
+}
+function zoomAt(factor, cx, cy) {
+  const next = Math.min(2.5, Math.max(0.08, view.s * factor));
+  view.x = cx - (cx - view.x) * (next / view.s);
+  view.y = cy - (cy - view.y) * (next / view.s);
+  view.s = next;
+  apply();
+}
+function focusRect(x, y, w, h, pad, animate) {
+  const vw = innerWidth, vh = innerHeight - 84;
+  view.s = Math.min((vw - pad * 2) / w, (vh - pad * 2) / h, 1.25);
+  view.x = (vw - w * view.s) / 2 - x * view.s;
+  view.y = (vh - h * view.s) / 2 - y * view.s;
+  world.style.transition = animate && !reduceMotion ? "transform 0.5s cubic-bezier(.2,.8,.2,1)" : "";
+  apply();
+  setTimeout(() => (world.style.transition = ""), 520);
+}
+let current = "b1";
+function markNav() {
+  document.querySelectorAll("[data-go]").forEach((b) => b.classList.toggle("on", b.dataset.go === current));
+}
+function fit(animate = true) {
+  current = null; markNav();
+  focusRect(0, 0, world.offsetWidth, world.offsetHeight, 20, animate);
+}
+function go(id, animate = true) {
+  current = id; markNav();
+  const el = document.getElementById(id);
+  focusRect(el.offsetLeft, el.offsetTop - 96, el.offsetWidth, el.offsetHeight + 96, 32, animate);
+}
+
+viewport.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(-e.deltaY * 0.01), e.clientX, e.clientY);
+  else { view.x -= e.deltaX; view.y -= e.deltaY; apply(); }
+}, { passive: false });
+let drag = null;
+viewport.addEventListener("pointerdown", (e) => {
+  if (e.target.closest("button, a")) return;
+  drag = { x: e.clientX - view.x, y: e.clientY - view.y };
+  viewport.classList.add("dragging");
+  viewport.setPointerCapture(e.pointerId);
+});
+viewport.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  view.x = e.clientX - drag.x; view.y = e.clientY - drag.y; apply();
+});
+viewport.addEventListener("pointerup", () => { drag = null; viewport.classList.remove("dragging"); });
+document.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => go(b.dataset.go)));
+document.getElementById("fit").addEventListener("click", () => fit());
+document.getElementById("zoom-in").addEventListener("click", () => zoomAt(1.25, innerWidth / 2, innerHeight / 2));
+document.getElementById("zoom-out").addEventListener("click", () => zoomAt(0.8, innerWidth / 2, innerHeight / 2));
+addEventListener("keydown", (e) => {
+  if (e.key >= "1" && e.key <= "5") go("b" + e.key);
+  if (e.key === "0") fit();
+  if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+    const n = Number((current || "b1").slice(1)) + (e.key === "ArrowRight" ? 1 : -1);
+    go("b" + Math.min(5, Math.max(1, n)));
+  }
+});
+addEventListener("resize", () => (current ? go(current, false) : fit(false)));
+
+/* ═════════ SO-101 model ═════════ */
+function diamondTexture() {
+  const c = document.createElement("canvas");
+  c.width = 256; c.height = 1024;
+  const g = c.getContext("2d");
+  g.fillStyle = "#f3f3f1"; g.fillRect(0, 0, c.width, c.height);
+  g.fillStyle = "#1b1b1d";
+  for (let row = 0; row < 7; row++) {
+    for (let col = 0; col < 2; col++) {
+      const x = 76 + col * 104 + (row % 2) * 0, y = 150 + row * 110;
+      g.save(); g.translate(x, y); g.rotate(Math.PI / 4);
+      g.beginPath(); g.roundRect(-26, -26, 52, 52, 6); g.fill();
+      g.restore();
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+const DIAMONDS = diamondTexture();
+
+function materials(kind) {
+  if (kind === "ghost") {
+    const m = new THREE.MeshBasicMaterial({ color: 0x4d9bff, transparent: true, opacity: 0.22, depthWrite: false });
+    return { plastic: m, servo: m, horn: m, sticker: m, decal: null };
+  }
+  return {
+    plastic: new THREE.MeshPhysicalMaterial({ color: 0xf2f2ef, roughness: 0.52, clearcoat: 0.15, clearcoatRoughness: 0.6 }),
+    servo: new THREE.MeshPhysicalMaterial({ color: 0x1a1a1c, roughness: 0.34, metalness: 0.05, clearcoat: 0.4, clearcoatRoughness: 0.3 }),
+    horn: new THREE.MeshStandardMaterial({ color: 0xd4d6da, roughness: 0.28, metalness: 0.85 }),
+    sticker: new THREE.MeshStandardMaterial({ color: 0xe8e8e6, roughness: 0.7 }),
+    decal: new THREE.MeshPhysicalMaterial({ map: DIAMONDS, roughness: 0.52, clearcoat: 0.15, clearcoatRoughness: 0.6 }),
+  };
+}
+
+function rbox(w, h, d, mat, r = 0.35) {
+  const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 4, Math.min(r, w / 2, h / 2, d / 2)), mat);
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+
+// A Feetech STS3215: black body, silver horn on the output face (+Z), small label sticker.
+function servo(M, w, h, d, hornAxis = "z") {
+  const g = new THREE.Group();
+  g.add(rbox(w, h, d, M.servo, 0.3));
+  const horn = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.28, 40), M.horn);
+  horn.castShadow = true;
+  if (hornAxis === "z") { horn.rotation.x = Math.PI / 2; horn.position.z = d / 2 + 0.14; }
+  if (hornAxis === "y") { horn.position.y = h / 2 + 0.14; }
+  if (hornAxis === "x") { horn.rotation.z = Math.PI / 2; horn.position.x = w / 2 + 0.14; }
+  g.add(horn);
+  if (M.sticker !== M.servo) {
+    const s = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.5, h * 0.22), M.sticker);
+    s.position.set(0, -h * 0.22, -d / 2 - 0.01); s.rotation.y = Math.PI;
+    g.add(s);
+  }
+  return g;
+}
+
+function decal(M, w, h, z) {
+  if (!M.decal) return null;
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), M.decal);
+  p.position.z = z;
+  p.receiveShadow = true;
+  return p;
+}
+
+function jaw(M, length, flip) {
+  const s = new THREE.Shape();
+  if (!flip) { s.moveTo(0, 0); s.lineTo(length, -0.9); s.lineTo(length, -1.5); s.lineTo(0, -2.4); }
+  else { s.moveTo(0, 0); s.lineTo(length * 0.92, 0.7); s.lineTo(length * 0.92, 1.3); s.lineTo(0, 2.0); }
+  s.closePath();
+  const geo = new THREE.ExtrudeGeometry(s, { depth: 2.2, bevelEnabled: true, bevelThickness: 0.25, bevelSize: 0.25, bevelSegments: 3 });
+  geo.translate(0, 0, -1.1);
+  const m = new THREE.Mesh(geo, M.plastic);
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+
+// Joint angles in degrees; claw is 0 (closed) to 1 (open).
+function buildArm({ kind = "solid", leader = false } = {}) {
+  const M = materials(kind);
+  const root = new THREE.Group();
+  const servos = [];
+
+  const plate = rbox(14, 1.2, 12, M.plastic, 0.5); plate.position.y = 0.6; root.add(plate);
+  const pan = new THREE.Group(); pan.position.y = 1.2; root.add(pan);
+  const panServo = servo(M, 4.6, 3.6, 2.6, "y"); panServo.position.y = 1.8; pan.add(panServo); servos.push(panServo);
+  const bracket = rbox(5.2, 2.6, 4.6, M.plastic, 0.5); bracket.position.y = 4.4; pan.add(bracket);
+
+  const shoulder = new THREE.Group(); shoulder.position.y = 6.2; pan.add(shoulder);
+  const sServo = servo(M, 4.4, 3.6, 2.6); shoulder.add(sServo); servos.push(sServo);
+  const upper = rbox(3.0, 11.2, 3.2, M.plastic, 0.6); upper.position.y = 5.6; shoulder.add(upper);
+  const d1 = decal(M, 2.2, 8.6, 1.62); if (d1) { d1.position.y = 5.6; shoulder.add(d1); }
+
+  const elbow = new THREE.Group(); elbow.position.y = 11.2; shoulder.add(elbow);
+  const eServo = servo(M, 4.4, 3.6, 2.6); elbow.add(eServo); servos.push(eServo);
+  const fore = rbox(13.6, 2.8, 3.2, M.plastic, 0.6); fore.position.x = 6.8; elbow.add(fore);
+  const d2 = decal(M, 2.0, 9.6, 1.62); if (d2) { d2.position.x = 7; d2.rotation.z = Math.PI / 2; elbow.add(d2); }
+
+  const wrist = new THREE.Group(); wrist.position.x = 13.6; elbow.add(wrist);
+  const wServo = servo(M, 3.6, 4.4, 2.6); wrist.add(wServo); servos.push(wServo);
+  const wlink = rbox(3.0, 2.6, 3.2, M.plastic, 0.5); wlink.position.x = 2.6; wrist.add(wlink);
+
+  const roll = new THREE.Group(); roll.position.x = 4.2; wrist.add(roll);
+  const rServo = servo(M, 2.6, 3.6, 4.2, "x"); rServo.position.x = 1.3; roll.add(rServo); servos.push(rServo);
+
+  const clawPivot = new THREE.Group();
+  if (!leader) {
+    const gServo = servo(M, 4.2, 2.6, 3.4); gServo.position.set(4.8, 0.6, 0); roll.add(gServo); servos.push(gServo);
+    const fixed = jaw(M, 8.5, false); fixed.position.set(3.4, -0.6, 0); roll.add(fixed);
+    clawPivot.position.set(5.4, 1.6, 0); roll.add(clawPivot);
+    const moving = jaw(M, 7.6, true); moving.position.set(0, -1.4, 0); clawPivot.add(moving);
+  } else {
+    const gServo = servo(M, 3.4, 2.6, 3.2); gServo.position.set(4.2, 0.2, 0); roll.add(gServo); servos.push(gServo);
+    const grip = new THREE.Mesh(new THREE.CapsuleGeometry(1.15, 6.2, 8, 24), M.plastic);
+    grip.castShadow = true; grip.position.set(5.4, -4.4, 0); grip.rotation.z = rad(-12); roll.add(grip);
+    clawPivot.position.set(6.4, -1.2, 0); roll.add(clawPivot);
+    const trig = rbox(1.2, 4.2, 1.6, M.plastic, 0.5); trig.position.set(0.8, -2.0, 0); clawPivot.add(trig);
+  }
+
+  function setPose(p) {
+    pan.rotation.y = rad(p.pan || 0);
+    shoulder.rotation.z = -rad(p.lift || 0);
+    elbow.rotation.z = -rad(p.elbow || 0);
+    wrist.rotation.z = -rad(p.wrist || 0);
+    roll.rotation.x = rad(p.roll || 0);
+    clawPivot.rotation.z = leader ? -rad((1 - (p.claw ?? 0.5)) * 18) : rad((p.claw ?? 0.5) * 34);
+  }
+  if (kind === "ghost") [plate, panServo, bracket, sServo, upper].forEach((m) => (m.visible = false));
+  setPose({});
+  return { root, setPose, servos };
+}
+
+/* ═════════ scenes ═════════ */
+const views = [];
+function makeView(canvas, opts) {
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
+  } catch {
+    canvas.replaceWith(Object.assign(document.createElement("div"), {
+      className: "no-gl",
+      textContent: "3D preview needs graphics acceleration. Open this page in Safari, or turn on “Use graphics acceleration” in Chrome settings.",
+    }));
+    return null;
+  }
+  renderer.setPixelRatio(Math.min(2.5, devicePixelRatio * 1.5));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = opts.exposure ?? 1.05;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  const scene = new THREE.Scene();
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+  const key = new THREE.DirectionalLight(0xffffff, opts.dark ? 1.4 : 2.2);
+  key.position.set(14, 40, 22);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.radius = 6;
+  key.shadow.bias = -0.0004;
+  Object.assign(key.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 120 });
+  scene.add(key);
+  if (opts.dark) {
+    const rim = new THREE.DirectionalLight(0x9fb8ff, 1.2); rim.position.set(-20, 18, -20); scene.add(rim);
+  }
+
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(240, 240), new THREE.ShadowMaterial({ opacity: opts.dark ? 0.35 : 0.13 }));
+  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+
+  const camera = new THREE.PerspectiveCamera(opts.fov ?? 28, 1, 1, 400);
+  camera.position.set(...opts.cam);
+  camera.lookAt(new THREE.Vector3(...opts.target));
+
+  const arm = buildArm({ leader: opts.leader });
+  scene.add(arm.root);
+  let ghost = null;
+  if (opts.ghost) { ghost = buildArm({ kind: "ghost" }); scene.add(ghost.root); }
+
+  const v = { canvas, renderer, scene, camera, arm, ghost, w: 0, h: 0 };
+  v.resize = () => {
+    const w = canvas.offsetWidth, h = canvas.offsetHeight;
+    if (w === v.w && h === v.h) return;
+    v.w = w; v.h = h;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h; camera.updateProjectionMatrix();
+  };
+  v.render = () => { v.resize(); renderer.render(scene, camera); };
+  views.push(v);
+  return v;
+}
+
+const v1a = makeView(document.getElementById("c1a"), { cam: [34, 24, 60], target: [12, 11, 0] });
+const v1b = makeView(document.getElementById("c1b"), { cam: [34, 24, 60], target: [12, 11, 0], leader: true });
+const v2 = makeView(document.getElementById("c2"), { cam: [38, 24, 74], target: [12, 9, 0], ghost: true, fov: 30 });
+v2?.ghost.setPose({ claw: 0.5 });
+const v3 = makeView(document.getElementById("c3"), { cam: [36, 20, 70], target: [12, 9, 0], fov: 30 });
+const v4 = makeView(document.getElementById("c4"), { cam: [42, 28, 74], target: [11, 9, 0], fov: 30 });
+const v5 = makeView(document.getElementById("c5"), { cam: [32, 22, 58], target: [12, 9, 0], dark: true, exposure: 1.2 });
+
+/* ═════════ 2D details ═════════ */
+const barsLive = document.getElementById("bars-live");
+const barsStill = document.getElementById("bars-still");
+barsLive.innerHTML = barsStill.innerHTML = "<div><i></i></div>".repeat(6);
+const liveFills = barsLive.querySelectorAll("i");
+[0.5, 0.36, 0.62, 0.55, 0.5, 0.42].forEach((v, i) => (barsStill.querySelectorAll("i")[i].style.height = v * 100 + "%"));
+
+const RINGS = [
+  { name: "Base", color: "#0a84ff", pct: 96 },
+  { name: "Upper arm", color: "#ff9f0a", pct: 22, low: true },
+  { name: "Elbow", color: "#30d158", pct: 88 },
+  { name: "Wrist", color: "#bf5af2", pct: 91 },
+  { name: "Claw", color: "#ff375f", pct: 100 },
+];
+const ringSvg = document.getElementById("rings");
+const legend = document.getElementById("ring-legend");
+RINGS.forEach((r, i) => {
+  const radius = 156 - i * 27;
+  ringSvg.insertAdjacentHTML("beforeend", `
+    <circle cx="170" cy="170" r="${radius}" fill="none" stroke="${r.color}" stroke-opacity="0.14" stroke-width="21"/>
+    <circle class="ring" data-i="${i}" cx="170" cy="170" r="${radius}" fill="none" stroke="${r.color}" stroke-width="21"
+      stroke-linecap="round" pathLength="100" stroke-dasharray="0 100" transform="rotate(-90 170 170)"/>`);
+  legend.insertAdjacentHTML("beforeend", `
+    <li class="${r.low ? "low" : ""}"><span class="dot" style="background:${r.color};width:12px;height:12px"></span>${r.name}
+      <span class="mini"><i style="background:${r.color};width:0" data-bar="${i}"></i></span><b data-pct="${i}">0%</b></li>`);
+});
+const ringEls = [...document.querySelectorAll(".ring")];
+const ringTotal = document.getElementById("ring-total");
+
+const CHIP_DATA = [
+  ["Base", "12.2 V · 48°"], ["Upper arm", "12.3 V · 47°"], ["Elbow", "12.3 V · 47°"],
+  ["Wrist", "12.3 V · 47°"], ["Wrist roll", "12.2 V · 47°"], ["Claw", "12.2 V · 47°"],
+];
+const chips = document.getElementById("chips");
+chips.innerHTML = CHIP_DATA.map(([n, m]) => `<div class="chip"><span class="dot glow-green" style="width:7px;height:7px"></span>${n}<span class="meta">${m}</span></div>`).join("");
+const chipEls = [...chips.children];
+const CHIP_SHOW = [0, 1, 2, 3, 5];
+chipEls.forEach((c, i) => { if (!CHIP_SHOW.includes(i)) c.style.display = "none"; });
+if (!v4) chips.style.display = "none";
+
+const wave = document.getElementById("wave");
+wave.innerHTML = "<i></i>".repeat(14);
+const waveBars = [...wave.children];
+const recTime = document.getElementById("rec-time");
+
+/* ═════════ animation ═════════ */
+const tmp = new THREE.Vector3();
+function frame(t) {
+  const s = reduceMotion ? 2 : t / 1000;
+  const w = (f, p = 0) => Math.sin(s * f + p);
+
+  const live = { pan: 22 * w(0.6), lift: 14 * w(0.5, 1), elbow: 18 * w(0.7, 2), wrist: 20 * w(0.9, 3), claw: 0.5 + 0.5 * w(1.4) };
+  v1a?.arm.setPose(live);
+  v1b?.arm.setPose({ pan: -8, lift: -6, elbow: 10, wrist: 6, claw: 0.4 });
+  [0.5 + live.pan / 60, 0.45 + live.lift / 50, 0.5 + live.elbow / 50, 0.5 + live.wrist / 50, 0.5, live.claw]
+    .forEach((v, i) => (liveFills[i].style.height = Math.max(6, Math.min(100, v * 100)) + "%"));
+
+  const fore = 11 + 2 * w(0.6, 1);
+  v2?.arm.setPose({ pan: 0, lift: 2 + 1.2 * w(0.8), elbow: fore, wrist: -3, claw: 0.48 });
+
+  v3?.arm.setPose({ pan: 38 * w(0.35), lift: 8 * w(0.5), elbow: 32 * w(0.62, 1), wrist: 40 * w(0.8, 2), claw: 0.5 + 0.5 * w(1.2) });
+  const grow = reduceMotion ? 1 : Math.min(1, (s % 9) / 3.5);
+  let total = 0;
+  ringEls.forEach((c, i) => {
+    const pct = RINGS[i].pct * grow; total += pct;
+    c.setAttribute("stroke-dasharray", `${pct} 100`);
+    legend.querySelector(`[data-pct="${i}"]`).textContent = Math.round(pct) + "%";
+    legend.querySelector(`[data-bar="${i}"]`).style.width = pct + "%";
+  });
+  ringTotal.textContent = Math.round(total / RINGS.length) + "%";
+
+  if (v4) v4.arm.setPose({ pan: -20 + 6 * w(0.3), lift: 6, elbow: 14, wrist: 10, claw: 0.55 });
+  v4?.render();
+  v4?.arm.servos.forEach((sv, i) => {
+    const el = chipEls[i];
+    if (!el || el.style.display === "none") return;
+    sv.getWorldPosition(tmp);
+    tmp.project(v4.camera);
+    el.style.left = ((tmp.x + 1) / 2) * v4.w + "px";
+    el.style.top = ((1 - tmp.y) / 2) * v4.h + "px";
+  });
+
+  v5?.arm.setPose({ pan: 15 * w(0.45), lift: 10 * w(0.55, 1), elbow: 8 + 22 * w(0.7, 2), wrist: 25 * w(0.85, 3), claw: 0.5 + 0.5 * w(1.1) });
+  waveBars.forEach((b, i) => (b.style.height = 5 + Math.abs(Math.sin(s * 3 + i * 0.7)) * 17 + "px"));
+  recTime.textContent = `0:${String(12 + Math.floor(s % 40)).padStart(2, "0")}`;
+
+  views.forEach((v) => v !== v4 && v.render());
+  if (!reduceMotion) requestAnimationFrame(frame);
+}
+
+if (/^#b[1-5]$/.test(location.hash)) go(location.hash.slice(1), false);
+else if (location.hash === "#all") fit(false);
+else go("b1", false);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+[project]
+name = "pivot-sidecar"
+version = "0.1.0"
+description = "Hardware sidecar for Pivot: talks to SO-101 arms through LeRobot over a JSON-lines protocol."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # Pinned: Pivot calls into LeRobot's motor bus internals, which change between releases.
+    "lerobot[feetech] @ git+https://github.com/huggingface/lerobot.git@297774fca4e3ad0aa34e7425fbf937111637e77b",
+]
+
+[project.scripts]
+pivot-sidecar = "pivot_sidecar.server:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pivot_sidecar"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

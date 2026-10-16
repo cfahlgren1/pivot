@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pivot</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="titlebar" data-tauri-drag-region>
+        <div class="progress" id="progress" data-tauri-drag-region></div>
+        <div class="badge" id="badge" hidden></div>
+      </header>
+      <main class="stage">
+        <div class="view"><canvas id="arm"></canvas></div>
+        <section class="panel" id="panel" aria-live="polite"></section>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
