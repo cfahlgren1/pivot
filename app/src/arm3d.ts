@@ -273,8 +273,8 @@ export class ArmView {
     ground.receiveShadow = true;
     this.scene.add(ground);
 
-    this.camera.position.set(44, 27, 88);
-    this.camera.lookAt(13, 8, 0);
+    this.camera.position.set(56, 44, 120);
+    this.camera.lookAt(8, 19, 0);
     this.setKind("follower");
     requestAnimationFrame(this.tick);
   }
