@@ -50,6 +50,7 @@ function go(step: Step, render: () => void | Promise<void>): void {
 }
 
 type Screen = { eyebrow?: string; title: string; lede?: string; body?: string; actions?: string };
+let shownTitle = "";
 function screen(s: Screen): void {
   panel.innerHTML = `
     ${s.eyebrow ? `<p class="eyebrow">${s.eyebrow}</p>` : ""}
@@ -57,10 +58,13 @@ function screen(s: Screen): void {
     ${s.lede ? `<p class="lede">${s.lede}</p>` : ""}
     ${s.body ?? ""}
     ${s.actions ? `<div class="actions">${s.actions}</div>` : ""}`;
-  // Re-trigger the entrance animation for each new screen.
-  panel.style.animation = "none";
+  // Live screens redraw several times a second; only slide in when the screen itself changes.
+  const title = `${s.eyebrow}|${s.title}`;
+  if (title === shownTitle) return;
+  shownTitle = title;
+  panel.classList.remove("enter");
   void panel.offsetWidth;
-  panel.style.animation = "";
+  panel.classList.add("enter");
 }
 
 function button(id: string, label: string, kind = ""): string {

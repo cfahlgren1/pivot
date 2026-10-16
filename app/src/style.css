@@ -121,6 +121,9 @@ button {
 .panel {
   max-width: 520px;
   padding-bottom: 32px;
+}
+
+.panel.enter {
   animation: enter 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -391,7 +394,7 @@ pre {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .panel {
+  .panel.enter {
     animation: none;
   }
 }
