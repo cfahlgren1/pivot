@@ -419,6 +419,368 @@ pre {
   margin: 0;
 }
 
+/* ── shared bits for drive / record / replay ── */
+.note {
+  font-size: 13px;
+  color: var(--ink-2);
+  margin: 10px 0 0;
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.row.between {
+  justify-content: space-between;
+  margin: 0 0 8px;
+}
+
+.seg {
+  display: inline-flex;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 3px;
+  border-radius: 9px;
+}
+
+.seg button {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 5px 14px;
+  border-radius: 7px;
+  color: var(--ink-2);
+}
+
+.seg button.on {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+/* Xbox-style button glyphs, so on-screen hints match the controller. */
+.hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.hints > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.xb {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.xb.a {
+  background: #2fb344;
+}
+.xb.b {
+  background: #e5352b;
+}
+.xb.x {
+  background: #1f6fd6;
+}
+.xb.y {
+  background: #e8a917;
+}
+
+.key {
+  display: inline-block;
+  min-width: 26px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: #3a3a3c;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* ── drive ── */
+.choices {
+  display: grid;
+  gap: 12px;
+}
+
+.choice {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 16px;
+  align-items: center;
+  text-align: left;
+  border: 0;
+  cursor: pointer;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.1),
+    0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+.choice.on {
+  box-shadow:
+    0 0 0 2.5px var(--blue),
+    0 8px 30px rgba(0, 113, 227, 0.12);
+}
+
+.choice .art {
+  display: grid;
+  place-items: center;
+}
+
+.choice b {
+  display: block;
+  font-size: 16px;
+  margin-bottom: 3px;
+}
+
+.choice span > span {
+  display: block;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+
+.choice small {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.choice .dot {
+  width: 8px;
+  height: 8px;
+}
+
+.mapping {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 18px;
+  align-items: center;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+}
+
+.mapping ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.mapping b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* ── record ── */
+.form {
+  display: grid;
+  gap: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.field input,
+.field select,
+.inline-select {
+  font: inherit;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--ink);
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.18);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.inline-select {
+  padding: 2px 6px;
+  font-size: inherit;
+}
+
+.field input:focus,
+.field select:focus {
+  outline: 3px solid rgba(0, 113, 227, 0.4);
+}
+
+.countdown {
+  font: 700 120px/1 var(--display);
+  letter-spacing: -0.04em;
+  color: var(--blue);
+}
+
+.timer {
+  font: 700 88px/1 var(--display);
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.takes {
+  display: flex;
+  gap: 4px;
+  margin-top: 22px;
+}
+
+.takes i {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.takes i.kept {
+  background: var(--green);
+}
+.takes i.now {
+  background: var(--red);
+}
+
+.ring {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(var(--blue) 0 var(--p), rgba(0, 0, 0, 0.08) var(--p) 100%);
+  position: relative;
+}
+
+.ring::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: #f7f7f9;
+}
+
+.ring b {
+  position: relative;
+  font: 600 22px var(--display);
+}
+
+.chart {
+  display: grid;
+  gap: 2px;
+  padding: 10px 14px;
+  margin-top: 4px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+}
+
+.chart svg {
+  display: block;
+  width: 100%;
+  height: 18px;
+}
+
+/* ── recordings ── */
+.episodes {
+  max-height: 260px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
+
+.episodes li {
+  padding: 0;
+}
+
+.episode {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 10px 16px;
+  font-size: 14px;
+  text-align: left;
+}
+
+.episode.on {
+  background: rgba(0, 113, 227, 0.08);
+}
+
+.episode .num {
+  width: 24px;
+  font: 600 13px var(--mono);
+  color: var(--ink-3);
+}
+
+.episode .end {
+  margin-left: auto;
+  font: 13px var(--mono);
+  color: var(--ink-2);
+}
+
+.card-progress {
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+}
+
+.bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.bar i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--blue);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .panel.enter {
     animation: none;

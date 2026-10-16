@@ -22,6 +22,11 @@ export async function call<T = any>(method: string, params: Record<string, unkno
   return result;
 }
 
+/** Sends a request that gets no reply. Used for 60 Hz controller input. */
+export function notify(method: string, params: Record<string, unknown> = {}): void {
+  void invoke("sidecar_send", { line: JSON.stringify({ method, params }) });
+}
+
 /** Resolves once no requests are waiting on the sidecar, so a screen can be left without a reply landing on the next one. */
 export async function settled(): Promise<void> {
   while (pending.size) await new Promise((resolve) => setTimeout(resolve, 50));

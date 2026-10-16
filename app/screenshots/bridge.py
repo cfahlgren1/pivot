@@ -20,6 +20,7 @@ REAL_NAMES = {
     "/dev/tty.fake-handle-arm": "/dev/tty.usbmodem5A7A0187091",
     "Simulated claw arm": "USB Single Serial",
     "Simulated handle arm": "USB Single Serial",
+    ".cache/pivot-fake/recordings": "Library/Application Support/Pivot/recordings",
 }
 
 

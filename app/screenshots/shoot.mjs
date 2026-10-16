@@ -1,7 +1,8 @@
 // Regenerates the README screenshots in docs/screenshots/ from the real UI and the simulated arms.
 // Runs in headless Chromium with software WebGL, so it works without a GPU. Usage: pnpm screenshots
 import { spawn } from "node:child_process";
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
@@ -55,6 +56,9 @@ async function clickWhenReady(id) {
   await button.waitFor({ timeout: 60_000 });
   await button.click();
 }
+// Earlier runs leave recordings behind; start from an empty library so the shots are stable.
+await rm(join(homedir(), ".cache/pivot-fake/recordings"), { recursive: true, force: true });
+
 // A previous run may have left a simulated calibration behind; start that arm over if so.
 async function beginCalibration() {
   await page.locator("#relax, #recal").first().waitFor({ timeout: 60_000 });
@@ -90,10 +94,46 @@ await beginCalibration();
 await clickWhenReady("middle");
 await clickWhenReady("save");
 await clickWhenReady("next");
-await clickWhenReady("start");
-await page.locator("#stop").waitFor({ timeout: 30_000 });
-await page.waitForTimeout(3_000);
-await shoot("6-teleop");
+
+// Drive: the simulated controller (tauri-mock.js) is connected, so pick it.
+const pad = (patch) => page.evaluate((patch) => Object.assign(window.__pad, patch), patch);
+await clickWhenReady("pick-gamepad");
+await shoot("6-drive");
+await clickWhenReady("next");
+await pad({ buttons: { lb: true }, left_x: 0.8, right_trigger: 0.6 });
+await page.waitForTimeout(1500);
+await shoot("7-controller");
+
+// Record a take with the controller, then review it.
+await clickWhenReady("record");
+await page.locator("#task").waitFor();
+await shoot("8-record-setup");
+await clickWhenReady("go");
+await page.locator(".timer").waitFor({ timeout: 15_000 });
+await pad({ buttons: { lb: true }, left_x: -0.6, right_trigger: 0 });
+await page.waitForTimeout(3_200);
+await shoot("9-recording");
+await pad({ buttons: {}, left_x: 0, left_y: 0, right_y: 0, right_trigger: 0 });
+await clickWhenReady("done");
+await page.locator("#keep").waitFor();
+await page.waitForTimeout(1_000);
+await shoot("10-keep");
+await clickWhenReady("keep");
+// Two more quick takes so the recordings list has something in it.
+for (const stick of [0.7, -0.4]) {
+  await clickWhenReady("now");
+  await page.locator(".timer").waitFor({ timeout: 15_000 });
+  await pad({ buttons: { lb: true }, left_x: stick });
+  await page.waitForTimeout(2_000);
+  await pad({ buttons: {}, left_x: 0, right_y: 0 });
+  await clickWhenReady("done");
+  await clickWhenReady("keep");
+}
+await clickWhenReady("pause");
+await clickWhenReady("list");
+await page.locator(".episode").first().waitFor();
+await page.waitForTimeout(1_000);
+await shoot("11-recordings");
 
 // Frame each capture as a macOS window with traffic lights and a soft shadow, on a transparent background.
 const framePage = await browser.newPage({ viewport: { width: 1320, height: 900 }, deviceScaleFactor: 2 });
