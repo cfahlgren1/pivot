@@ -4,7 +4,7 @@
 
 # Pivot
 
-**Set up SO-101 robot arms without a terminal.** From plugging in to teleoperation in about ten minutes, one step at a time.
+**Set up SO-101 robot arms without a terminal.** Plug in, calibrate, then drive, record and replay, with the handle arm or a game controller.
 
 <a href="https://github.com/cfahlgren1/pivot/releases/latest"><img src="https://img.shields.io/github/v/release/cfahlgren1/pivot?include_prereleases&label=download&color=0071e3" alt="Download"></a> <img src="https://img.shields.io/badge/macOS-Apple%20Silicon-1d1d1f" alt="macOS, Apple Silicon"> <img src="https://img.shields.io/badge/size-29%20MB-orange" alt="29 MB"> <a href="https://github.com/huggingface/lerobot"><img src="https://img.shields.io/badge/built%20on-LeRobot-ffcc4d" alt="Built on LeRobot"></a>
 
@@ -30,7 +30,24 @@ LeRobot expects it, so `lerobot-record`, `lerobot-teleoperate` and training pick
   </tr>
   <tr>
     <td><img src="docs/screenshots/5-calibrate.png" alt=""><br><b>4–5. Calibrate.</b> Rings fill as you sweep each joint. Saving waits until every joint has covered its range.</td>
-    <td><img src="docs/screenshots/6-teleop.png" alt=""><br><b>6. Teleoperate.</b> The claw arm eases into the handle arm's pose, then follows it.</td>
+    <td><img src="docs/screenshots/6-drive.png" alt=""><br><b>6. Drive.</b> With the handle arm, or a game controller if you only have the claw arm.</td>
+  </tr>
+</table>
+
+## Drive, record, replay
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/7-controller.png" alt=""><br><b>Game controller.</b> Xbox, PlayStation or Switch Pro. Nothing moves unless <kbd>LB</kbd> is held, and the arm stays inside its calibrated range.</td>
+    <td width="50%"><img src="docs/screenshots/8-record-setup.png" alt=""><br><b>Describe the task.</b> Name it once, pick how many takes, and drive the arm to a starting pose.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/9-recording.png" alt=""><br><b>Record.</b> A countdown, a timer, and <kbd>A</kbd> to finish. Hands never leave the controller.</td>
+    <td><img src="docs/screenshots/10-keep.png" alt=""><br><b>Keep or redo.</b> Each take replays on the 3D arm before you keep it. Then a short reset, and the next take starts.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/11-recordings.png" alt=""><br><b>Replay.</b> Watch any take, or play it back on the real arm at half or full speed.</td>
+    <td>Takes are saved as JSON on your Mac, one file per take, using LeRobot's joint names and units. Exporting to a LeRobot dataset for training comes with camera support.</td>
   </tr>
 </table>
 
@@ -58,7 +75,7 @@ Setup with the LeRobot command line works, but a real first setup hits these:
 | Teleoperation starts | The claw arm snaps to the handle's pose | Eases into the pose over a second |
 | One missed read | Ends teleoperation | Retries, then reconnects |
 
-**Not yet:** setting IDs on brand-new motors (use `lerobot-setup-motors`), cameras and recording,
+**Not yet:** setting IDs on brand-new motors (use `lerobot-setup-motors`), cameras, exporting to LeRobot datasets, controller "claw mode" (move the claw in x/y/z instead of joint by joint),
 notarized builds, Windows and Linux.
 
 ## Develop
@@ -94,4 +111,4 @@ The release app bundles a frozen sidecar without PyTorch: LeRobot's motor code i
 hints, so a small stand-in replaces it (`sidecar/packaging/torch_stub.py`), and the build checks every
 LeRobot path Pivot uses still loads.
 
-**Status:** prototype. Works end to end against simulated arms; real-hardware testing is in progress.
+**Status:** prototype. Works end to end against simulated arms and a simulated controller; testing on real arms and a real controller is in progress.

@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pivot: drive, record, replay</title>
+<style>
+  :root {
+    --ink: #1d1d1f; --ink-2: #6e6e73; --ink-3: #aeaeb2; --hair: rgba(0,0,0,.08);
+    --blue: #0071e3; --green: #30d158; --amber: #ff9f0a; --red: #ff3b30;
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Inter, system-ui, sans-serif;
+    --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Inter, system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+  .board { margin: 0 0 44px; }
+  .label { display: flex; align-items: baseline; gap: 10px; margin: 0 0 12px; flex-wrap: wrap; }
+  .label b { font: 600 15px var(--display); color: var(--foreground, #1d1d1f); }
+  .label span { font-size: 13px; color: var(--muted-foreground, #6e6e73); }
+  .label i { font-style: normal; font: 600 11px var(--mono); color: #fff; background: var(--blue); border-radius: 6px; padding: 2px 7px; }
+  .fit { position: relative; width: 100%; aspect-ratio: 1200 / 780; }
+  .stage { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+
+  .win { position: relative; width: 1200px; height: 780px; border-radius: 12px; overflow: hidden; color: var(--ink);
+    background: radial-gradient(120% 90% at 30% 40%, #fff 0%, #f2f3f6 70%);
+    box-shadow: 0 0 0 .5px rgba(0,0,0,.22), 0 24px 60px rgba(0,0,0,.18), 0 6px 16px rgba(0,0,0,.06); }
+  .lights { position: absolute; top: 18px; left: 20px; display: flex; gap: 8px; z-index: 5; }
+  .lights i { width: 12px; height: 12px; border-radius: 50%; }
+  .lights i:nth-child(1) { background: #ff5f57; } .lights i:nth-child(2) { background: #febc2e; } .lights i:nth-child(3) { background: #28c840; }
+  .titlebar { height: 56px; display: flex; align-items: center; justify-content: center; position: relative; }
+  .back { position: absolute; left: 84px; font-size: 13px; font-weight: 500; color: var(--ink-2); }
+  .progress { display: flex; gap: 6px; } .progress i { width: 32px; height: 4px; border-radius: 2px; background: rgba(0,0,0,.1); display: block; }
+  .progress i.done { background: var(--ink); } .progress i.now { background: var(--blue); }
+  .pill { position: absolute; right: 20px; display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 500; color: var(--ink-2); background: rgba(0,0,0,.04); padding: 5px 11px; border-radius: 99px; }
+
+  .stagecols { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(380px, 1fr); align-items: center; height: 724px; padding: 0 64px 32px 0; }
+  .view { height: 100%; display: grid; place-items: center; position: relative; }
+  .panel { max-width: 500px; }
+  .eyebrow { font-size: 14px; font-weight: 600; color: var(--blue); margin: 0 0 12px; }
+  h1 { font: 700 44px/1.04 var(--display); letter-spacing: -.034em; margin: 0 0 16px; }
+  .lede { font-size: 17px; line-height: 1.45; color: var(--ink-2); margin: 0 0 24px; }
+  .actions { display: flex; gap: 12px; align-items: center; margin-top: 26px; }
+  .note { font-size: 13px; color: var(--ink-2); }
+  .btn { display: inline-flex; align-items: center; gap: 8px; border-radius: 12px; padding: 11px 22px; font-size: 15px; font-weight: 500; background: #fff;
+    box-shadow: 0 .5px 1.5px rgba(0,0,0,.2), 0 0 0 .5px rgba(0,0,0,.1); white-space: nowrap; }
+  .btn.primary { background: linear-gradient(#2a8bf2, #0a72e6); color: #fff; box-shadow: 0 .5px 1.5px rgba(0,60,140,.4); }
+  .btn.danger { background: var(--red); color: #fff; box-shadow: none; }
+  .btn.sm { padding: 6px 12px; font-size: 13px; border-radius: 9px; }
+  .card { background: rgba(255,255,255,.88); border-radius: 16px; box-shadow: 0 0 0 .5px rgba(0,0,0,.1), 0 4px 20px rgba(0,0,0,.04); }
+  .muted { color: var(--ink-2); }
+  .seg { display: inline-flex; background: rgba(0,0,0,.05); padding: 3px; border-radius: 9px; }
+  .seg span { white-space: nowrap; font-size: 13px; font-weight: 500; padding: 5px 14px; border-radius: 7px; color: var(--ink-2); }
+  .seg span.on { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+
+  /* Xbox button glyphs */
+  .xb { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font: 700 11px var(--sans); color: #fff; vertical-align: -5px; flex: none; }
+  .xb.a { background: #2fb344; } .xb.b { background: #e5352b; } .xb.x { background: #1f6fd6; } .xb.y { background: #e8a917; }
+  .xb.lb, .xb.rb, .xb.lt, .xb.rt, .xb.menu { width: auto; padding: 0 7px; border-radius: 6px; background: #3a3a3c; font-size: 10px; }
+  .hints { display: flex; gap: 18px; font-size: 13px; color: var(--ink-2); align-items: center; flex-wrap: wrap; }
+  .hints > span { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+
+  .list { list-style: none; padding: 0; margin: 0; border-radius: 16px; background: rgba(255,255,255,.88); box-shadow: 0 0 0 .5px rgba(0,0,0,.1), 0 4px 20px rgba(0,0,0,.04); }
+  .list li { display: flex; align-items: center; gap: 12px; padding: 12px 16px; font-size: 14px; }
+  .list li + li { border-top: .5px solid var(--hair); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-3); flex: none; }
+  .dot.ok { background: var(--green); box-shadow: 0 0 0 3px rgba(48,209,88,.2); }
+  .dot.live { background: var(--blue); box-shadow: 0 0 0 3px rgba(0,113,227,.2); }
+  .dot.rec { background: var(--red); box-shadow: 0 0 0 4px rgba(255,59,48,.22); }
+</style>
+</head>
+<body>
+<div id="boards"></div>
+<script>
+// ── drawings ─────────────────────────────────────────────────────────────────
+// Side view of the SO-101 in the app's style: white links, black servos. Angles in degrees.
+function arm({ lift = 0, elbow = 90, wrist = 0, claw = 0.4 } = {}, { ghost = false, scale = 1 } = {}) {
+  const rad = (d) => (d * Math.PI) / 180;
+  const p0 = [150, 228];
+  const a1 = rad(-90 + lift), p1 = [p0[0] + Math.cos(a1) * 112, p0[1] + Math.sin(a1) * 112];
+  const a2 = a1 + rad(elbow), p2 = [p1[0] + Math.cos(a2) * 104, p1[1] + Math.sin(a2) * 104];
+  const a3 = a2 + rad(wrist), p3 = [p2[0] + Math.cos(a3) * 30, p2[1] + Math.sin(a3) * 30];
+  const open = 6 + claw * 26;
+  const j1 = [p3[0] + Math.cos(a3 - rad(open)) * 46, p3[1] + Math.sin(a3 - rad(open)) * 46];
+  const j2 = [p3[0] + Math.cos(a3 + rad(open)) * 46, p3[1] + Math.sin(a3 + rad(open)) * 46];
+  const white = ghost ? 'rgba(0,113,227,.16)' : '#f6f6f4', edge = ghost ? 'rgba(0,113,227,.55)' : 'rgba(0,0,0,.14)', servo = ghost ? 'rgba(0,113,227,.28)' : '#1d1d1f';
+  const link = (a, b, w) => ghost ? `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="rgba(0,113,227,.22)" stroke-width="${w}" stroke-linecap="round"/>` : `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${edge}" stroke-width="${w + 2}" stroke-linecap="round"/><line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${white}" stroke-width="${w}" stroke-linecap="round"/>`;
+  const box = (p, s) => `<rect x="${p[0] - s / 2}" y="${p[1] - s / 2}" width="${s}" height="${s}" rx="5" fill="${servo}"/>`;
+  return `<g ${ghost ? 'stroke-dasharray="0"' : ''}>
+    ${ghost ? '' : `<ellipse cx="190" cy="268" rx="150" ry="10" fill="rgba(0,0,0,.08)"/><rect x="80" y="252" width="150" height="14" rx="5" fill="#f2f2f0" stroke="rgba(0,0,0,.1)"/>
+    <rect x="120" y="222" width="60" height="32" rx="5" fill="#1d1d1f"/>`}
+    ${link(p0, p1, 26)}${link(p1, p2, 24)}${link(p2, p3, 22)}${link(p3, j1, 9)}${link(p3, j2, 9)}
+    ${box(p0, 34)}${box(p1, 32)}${box(p2, 28)}</g>`;
+}
+const armSvg = (pose, opts = {}, ghostPose) => `<svg viewBox="-10 -40 420 330" width="${opts.w ?? 560}">${ghostPose ? arm(ghostPose, { ghost: true }) : ''}${arm(pose)}</svg>`;
+
+// Leader ("handle") arm: same kinematics, a grip and trigger instead of a claw.
+function handleArm() {
+  return `<svg viewBox="-10 -40 420 330" width="230">${arm({ lift: 8, elbow: 95, wrist: 10, claw: 0.1 })}</svg>`;
+}
+
+// Xbox-style controller. `hl` lists parts to highlight: ls, rs, lt, rt, lb, rb, a, b, x, y.
+function pad({ hl = [], w = 300 } = {}) {
+  const on = (k) => hl.includes(k);
+  const glow = (k, el) => on(k) ? el.replace('/>', ' stroke="#0071e3" stroke-width="4"/>') : el;
+  return `<svg viewBox="0 0 360 250" width="${w}">
+    <defs><linearGradient id="padg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbfbfa"/><stop offset="1" stop-color="#e4e4e1"/></linearGradient></defs>
+    ${glow('lt', `<rect x="62" y="22" width="62" height="34" rx="12" fill="${on('lt') ? '#d8e8fb' : '#d9d9d6'}"/>`)}
+    ${glow('rt', `<rect x="236" y="22" width="62" height="34" rx="12" fill="${on('rt') ? '#d8e8fb' : '#d9d9d6'}"/>`)}
+    ${glow('lb', `<rect x="56" y="46" width="84" height="20" rx="10" fill="${on('lb') ? '#0071e3' : '#c9c9c6'}"/>`)}
+    ${glow('rb', `<rect x="220" y="46" width="84" height="20" rx="10" fill="${on('rb') ? '#0071e3' : '#c9c9c6'}"/>`)}
+    <path d="M70 62 C 110 48, 250 48, 290 62 C 335 78, 352 160, 340 205 C 330 240, 290 238, 268 210 C 252 190, 238 178, 210 178 L150 178 C 122 178, 108 190, 92 210 C 70 238, 30 240, 20 205 C 8 160, 25 78, 70 62 Z" fill="url(#padg)" stroke="rgba(0,0,0,.14)" stroke-width="1.5"/>
+    <circle cx="180" cy="86" r="13" fill="#e6e6e3" stroke="rgba(0,0,0,.12)"/><circle cx="180" cy="86" r="7" fill="none" stroke="#9a9a97" stroke-width="2"/>
+    ${glow('ls', `<circle cx="104" cy="104" r="24" fill="${on('ls') ? '#d8e8fb' : '#d3d3d0'}"/>`)}<circle cx="104" cy="104" r="15" fill="#2c2c2e"/>
+    ${glow('rs', `<circle cx="222" cy="150" r="24" fill="${on('rs') ? '#d8e8fb' : '#d3d3d0'}"/>`)}<circle cx="222" cy="150" r="15" fill="#2c2c2e"/>
+    <path d="M132 140 h12 v-12 h12 v12 h12 v12 h-12 v12 h-12 v-12 h-12 Z" fill="#3a3a3c"/>
+    ${[['y', 258, 82, '#e8a917'], ['x', 236, 104, '#1f6fd6'], ['b', 280, 104, '#e5352b'], ['a', 258, 126, '#2fb344']].map(([k, x, y, c]) =>
+      `<circle cx="${x}" cy="${y}" r="11" fill="${c}" ${on(k) ? 'stroke="#0071e3" stroke-width="4"' : ''}/><text x="${x}" y="${y + 4}" text-anchor="middle" font-size="11" font-weight="700" fill="#fff" font-family="-apple-system, Helvetica">${k.toUpperCase()}</text>`).join('')}
+    </svg>`;
+}
+
+const titleBar = (center, { back = true, pill = '' } = {}) => `<div class="lights"><i></i><i></i><i></i></div>
+  <div class="titlebar">${back ? '<span class="back">‹ Back</span>' : ''}${center}${pill ? `<span class="pill">${pill}</span>` : ''}</div>`;
+const progress = (now, n = 8) => `<div class="progress">${Array.from({ length: n }, (_, i) => `<i class="${i < now ? 'done' : i === now ? 'now' : ''}"></i>`).join('')}</div>`;
+const padPill = `${pad({ w: 26 }).replace('width="26"', 'width="26" style="margin:-4px 0"')} Xbox controller · 82%`;
+
+// ── boards ───────────────────────────────────────────────────────────────────
+const boards = [];
+
+boards.push({ tag: 'Drive · 1', name: 'Choose how to drive', note: 'One choice before teleop. The controller card lights up when one is connected; no leader arm needed.', html: `
+<div class="win">${titleBar(progress(6), { pill: padPill })}
+  <div style="height:724px; display:flex; flex-direction:column; justify-content:center; padding:0 120px 40px;">
+    <p class="eyebrow">Step 6</p>
+    <h1>How do you want to drive it?</h1>
+    <p class="lede" style="max-width:640px;">Both record the same kind of data, so anything you record trains the same way.</p>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px;">
+      <div class="card" style="padding:26px 26px 22px;">
+        <div style="height:150px; display:grid; place-items:center;">${handleArm()}</div>
+        <b style="font-size:19px;">Handle arm</b>
+        <p class="muted" style="font-size:14px; line-height:1.45; margin:6px 0 14px;">Move the handle arm and the claw arm copies it. The most natural motion, and the best data.</p>
+        <div style="display:flex; align-items:center; gap:8px; font-size:13px;"><span class="dot ok"></span>Calibrated</div>
+      </div>
+      <div class="card" style="padding:26px 26px 22px; box-shadow:0 0 0 2.5px var(--blue), 0 8px 30px rgba(0,113,227,.12);">
+        <div style="height:150px; display:grid; place-items:center;">${pad({ w: 210 })}</div>
+        <b style="font-size:19px;">Xbox controller</b>
+        <p class="muted" style="font-size:14px; line-height:1.45; margin:6px 0 14px;">Steer the claw with the sticks, squeeze the triggers to grab. Works with just the claw arm.</p>
+        <div style="display:flex; align-items:center; gap:8px; font-size:13px;"><span class="dot live"></span>Connected over Bluetooth · battery 82%</div>
+      </div>
+    </div>
+    <div class="actions"><span class="btn primary">Continue with controller</span><span class="note">Any Xbox, PlayStation or Switch Pro controller works.</span></div>
+  </div>
+</div>` });
+
+boards.push({ tag: 'Drive · 2', name: 'Controller teleop', note: 'The controller diagram lights up with what you’re pressing. Nothing moves unless LB is held.', html: `
+<div class="win">${titleBar(progress(6), { pill: padPill })}
+  <div class="stagecols">
+    <div class="view">${armSvg({ lift: 18, elbow: 78, wrist: 22, claw: 0.15 }, { w: 600 })}
+      <div style="position:absolute; bottom:70px; left:50%; transform:translateX(-50%); display:flex; gap:10px;">
+        <span class="seg"><span class="on">Claw mode</span><span>Joint mode</span></span>
+        <span class="seg"><span>Slow</span><span class="on">Normal</span><span>Fast</span></span>
+      </div>
+    </div>
+    <div class="panel">
+      <p class="eyebrow">Step 6 · Xbox controller</p>
+      <h1>Hold LB and drive.</h1>
+      <p class="lede">Let go of LB and the arm freezes where it is.</p>
+      <div class="card" style="padding:18px 20px 14px; display:grid; grid-template-columns:auto 1fr; gap:18px; align-items:center;">
+        ${pad({ hl: ['lb', 'ls', 'rt'], w: 190 })}
+        <div style="display:grid; gap:9px; font-size:13px;">
+          <span><span class="xb lb">LB</span>&nbsp; Hold to move <b style="color:var(--blue);">· held</b></span>
+          <span><b>Left stick</b> &nbsp;<span class="muted">claw forward / back, left / right</span></span>
+          <span><b>Right stick</b> &nbsp;<span class="muted">claw up / down, tilt wrist</span></span>
+          <span><span class="xb rt">RT</span> <span class="xb lt">LT</span>&nbsp; <span class="muted">close / open claw</span></span>
+          <span><span class="xb rb">RB</span>&nbsp; <span class="muted">roll wrist</span></span>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px; margin-top:14px;">
+        ${[['Claw', '62% closed'], ['Height', '9 cm'], ['Speed', '4 cm/s']].map(([k, v]) => `<div class="card" style="flex:1; padding:12px 14px;"><b style="font:600 20px var(--display);">${v}</b><div class="muted" style="font-size:12px;">${k}</div></div>`).join('')}
+      </div>
+      <div class="actions"><span class="btn primary">Record a demo</span><span class="btn">Stop</span></div>
+    </div>
+  </div>
+</div>` });
+
+boards.push({ tag: 'Record · 1', name: 'Recording', note: 'Name the task once. During a take the panel is just a timer and the buttons you can press, on screen and on the controller.', html: `
+<div class="win">${titleBar(`<div style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600;"><span class="dot rec"></span>Recording</div>`, { back: false, pill: padPill })}
+  <div class="stagecols">
+    <div class="view">${armSvg({ lift: 30, elbow: 62, wrist: 30, claw: 0.75 }, { w: 600 })}
+      <div style="position:absolute; left:60px; right:20px; bottom:70px; height:6px; border-radius:3px; background:rgba(0,0,0,.07);"><div style="width:28%; height:100%; border-radius:3px; background:var(--red);"></div></div>
+    </div>
+    <div class="panel">
+      <p class="eyebrow" style="color:var(--red);">Episode 4 of 20 · pick-up-cube</p>
+      <div style="font:700 96px/1 var(--display); letter-spacing:-.04em; font-variant-numeric:tabular-nums;">0:08</div>
+      <p class="lede" style="margin-top:10px;">“Pick up the red cube and put it in the bowl.” Stops by itself at 0:30.</p>
+      <div class="actions"><span class="btn danger">Done</span><span class="btn">Discard</span></div>
+      <div class="hints" style="margin-top:22px;"><span><span class="xb a">A</span>Done</span><span><span class="xb b">B</span>Discard</span><span><span class="xb menu">☰</span>Pause session</span></div>
+      <div style="display:flex; gap:6px; margin-top:28px;">${Array.from({ length: 20 }, (_, i) => `<i style="flex:1; height:6px; border-radius:3px; display:block; background:${i < 3 ? 'var(--green)' : i === 3 ? 'var(--red)' : 'rgba(0,0,0,.08)'}"></i>`).join('')}</div>
+      <p class="note" style="margin-top:8px;">3 kept · 17 to go</p>
+    </div>
+  </div>
+</div>` });
+
+boards.push({ tag: 'Record · 2', name: 'Keep this take?', note: 'Every take ends on Keep / Redo, with the take replaying in 3D. Then a reset countdown, so the next one starts hands-free.', html: `
+<div class="win">${titleBar(`<div style="font-size:13px; font-weight:600; color:var(--ink-2);">pick-up-cube · 3 of 20 kept</div>`, { back: false, pill: padPill })}
+  <div class="stagecols">
+    <div class="view">${armSvg({ lift: 24, elbow: 70, wrist: 26, claw: 0.2 }, { w: 600 }, { lift: 6, elbow: 92, wrist: 6, claw: 0.6 })}
+      <div style="position:absolute; bottom:64px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:12px; font-size:13px; white-space:nowrap;" class="muted">
+        <span style="width:30px; height:30px; border-radius:50%; background:#fff; box-shadow:0 0 0 .5px rgba(0,0,0,.15); display:grid; place-items:center;">❚❚</span>
+        <div style="width:320px; height:5px; border-radius:3px; background:rgba(0,0,0,.08);"><div style="width:55%; height:100%; border-radius:3px; background:var(--ink);"></div></div>0:11 / 0:19</div>
+    </div>
+    <div class="panel">
+      <p class="eyebrow">Episode 4 of 20</p>
+      <h1>Keep this take?</h1>
+      <p class="lede">19 seconds. Keep it if it’s how you’d want the robot to do it: no fumbles, no long pauses.</p>
+      <div class="actions"><span class="btn">Redo</span><span class="btn primary">Keep</span><span class="btn sm" style="margin-left:4px;">▶︎ Replay on arm</span></div>
+      <div class="hints" style="margin-top:20px;"><span><span class="xb a">A</span>Keep</span><span><span class="xb x">X</span>Redo</span><span><span class="xb y">Y</span>Replay on arm</span></div>
+      <div class="card" style="margin-top:28px; padding:14px 16px; display:flex; align-items:center; gap:12px; font-size:14px;">
+        <div style="width:38px; height:38px; border-radius:50%; display:grid; place-items:center; background:conic-gradient(var(--blue) 0 60%, rgba(0,0,0,.08) 60% 100%); position:relative;"><div style="position:absolute; inset:4px; border-radius:50%; background:#fff;"></div><b style="position:relative; font-size:14px;">3</b></div>
+        <span>Then: put the cube somewhere new. <span class="muted">Next take starts in 3 s.</span></span>
+      </div>
+    </div>
+  </div>
+</div>` });
+
+boards.push({ tag: 'Replay · 1', name: 'Your recordings', note: 'Datasets live in a simple list. Pick an episode, see its motion, replay it on the arm or delete it.', html: `
+<div class="win">${titleBar(`<div class="seg"><span>Drive</span><span>Record</span><span class="on">Recordings</span></div>`, { back: false, pill: padPill })}
+  <div style="display:grid; grid-template-columns:330px 1fr; gap:26px; padding:8px 40px 0; height:724px;">
+    <div>
+      <div style="display:flex; align-items:baseline; justify-content:space-between; margin:6px 2px 10px;"><b style="font:700 22px var(--display);">pick-up-cube</b><span class="note">20 episodes · 6 min</span></div>
+      <ul class="list">
+        ${Array.from({ length: 9 }, (_, i) => `<li style="${i === 3 ? 'background:rgba(0,113,227,.08);' : ''}"><span style="font:600 13px var(--mono); width:22px; color:var(--ink-3);">${i + 1}</span>
+          <svg width="96" height="26" viewBox="0 0 96 26">${[0, 1, 2].map((k) => `<polyline points="${Array.from({ length: 24 }, (_, t) => `${t * 4.1},${13 + Math.sin(t / 3.2 + i + k * 1.7) * (6 - k * 1.5)}`).join(' ')}" fill="none" stroke="${['#0a84ff', '#ff9f0a', '#30d158'][k]}" stroke-width="1.6"/>`).join('')}</svg>
+          <span class="muted" style="margin-left:auto; font:13px var(--mono);">0:${16 + ((i * 7) % 11)}</span>${i === 3 ? '<span class="dot live"></span>' : '<span class="dot" style="opacity:0"></span>'}</li>`).join('')}
+      </ul>
+      <div style="display:flex; gap:10px; margin-top:12px;"><span class="btn sm">Record more</span><span class="btn sm">Show in Finder</span></div>
+    </div>
+    <div style="display:flex; flex-direction:column;">
+      <div class="card" style="flex:1; display:grid; place-items:center; position:relative;">${armSvg({ lift: 20, elbow: 74, wrist: 18, claw: 0.3 }, { w: 520 })}
+        <span style="position:absolute; top:14px; left:16px; font-size:13px; font-weight:600;">Episode 4 <span class="muted" style="font-weight:400;">· recorded with Xbox controller</span></span></div>
+      <div class="card" style="margin-top:12px; padding:12px 16px;">
+        ${['Base', 'Upper arm', 'Elbow', 'Wrist', 'Claw'].map((j, i) => `<div style="display:grid; grid-template-columns:76px 1fr; align-items:center; font-size:12px; height:22px;"><span class="muted">${j}</span>
+          <svg width="100%" height="20" viewBox="0 0 600 20" preserveAspectRatio="none"><polyline points="${Array.from({ length: 80 }, (_, t) => `${t * 7.6},${10 + Math.sin(t / 9 + i * 1.1) * 7}`).join(' ')}" fill="none" stroke="${['#0a84ff', '#ff9f0a', '#30d158', '#bf5af2', '#ff375f'][i]}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>`).join('')}
+      </div>
+      <div style="display:flex; gap:10px; margin:14px 0 30px; align-items:center;"><span class="btn primary">▶︎ Replay on arm</span><span class="btn">Delete episode</span><span class="hints" style="margin-left:auto;"><span><span class="xb y">Y</span>Replay</span></span></div>
+    </div>
+  </div>
+</div>` });
+
+boards.push({ tag: 'Replay · 2', name: 'Replaying on the arm', note: 'The arm first eases to the episode’s start pose (ghost), then plays it back. Stop is always one press away.', html: `
+<div class="win">${titleBar(progress(2, 3), { pill: padPill })}
+  <div class="stagecols">
+    <div class="view">${armSvg({ lift: 14, elbow: 82, wrist: 12, claw: 0.5 }, { w: 600 }, { lift: 30, elbow: 62, wrist: 30, claw: 0.7 })}
+      <div style="position:absolute; bottom:70px; left:50%; transform:translateX(-50%); font-size:13px; display:flex; gap:16px; white-space:nowrap;" class="muted">
+        <span><span style="display:inline-block; width:12px; height:12px; border-radius:3px; background:#f6f6f4; box-shadow:0 0 0 1px rgba(0,0,0,.2); vertical-align:-2px;"></span> Where the arm is</span>
+        <span><span style="display:inline-block; width:12px; height:12px; border-radius:3px; background:rgba(0,113,227,.25); box-shadow:0 0 0 1px rgba(0,113,227,.6); vertical-align:-2px;"></span> Where the recording goes</span></div>
+    </div>
+    <div class="panel">
+      <p class="eyebrow">Replaying episode 4 · pick-up-cube</p>
+      <h1>Watch the claw arm.</h1>
+      <p class="lede">It repeats exactly what you recorded. Put the cube where it was at the start, or it’ll grab at air.</p>
+      <div class="card" style="padding:16px 18px;">
+        <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:8px;"><b>0:07</b><span class="muted">0:19</span></div>
+        <div style="height:6px; border-radius:3px; background:rgba(0,0,0,.08);"><div style="width:37%; height:100%; border-radius:3px; background:var(--blue);"></div></div>
+        <div style="display:flex; align-items:center; gap:10px; margin-top:14px;"><span class="muted" style="font-size:13px;">Speed</span><span class="seg"><span class="on">½×</span><span>1×</span></span><span class="note" style="margin-left:auto;">Starts at half speed</span></div>
+      </div>
+      <div class="actions"><span class="btn danger">Stop</span><span class="btn">Replay again</span></div>
+      <div class="hints" style="margin-top:18px;"><span><span class="xb b">B</span>Stop</span><span><span class="xb y">Y</span>Replay again</span></div>
+    </div>
+  </div>
+</div>` });
+
+document.getElementById('boards').innerHTML = boards.map((b) => `
+  <section class="board"><div class="label"><i>${b.tag}</i><b>${b.name}</b><span>${b.note}</span></div>
+  <div class="fit"><div class="stage">${b.html}</div></div></section>`).join('');
+
+function fitAll() {
+  document.querySelectorAll('.fit').forEach((fit) => {
+    fit.querySelector('.stage').style.transform = `scale(${fit.clientWidth / 1200})`;
+  });
+}
+fitAll();
+addEventListener('resize', fitAll);
+</script>
+</body>
+</html>
