@@ -8,6 +8,9 @@ use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::Mutex;
 use std::thread;
+use std::time::Duration;
+
+use gilrs::{Axis, Button, Gilrs, PowerInfo};
 
 use tauri::{AppHandle, Emitter, Manager, RunEvent, State};
 
@@ -85,6 +88,60 @@ fn start_sidecar(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Streams the first connected game controller to the UI as `gamepad` events, ~60 times a second.
+/// Read natively because the Gamepad API is unreliable inside WKWebView.
+fn start_gamepad(app: AppHandle) {
+    thread::spawn(move || {
+        let mut gilrs = match Gilrs::new() {
+            Ok(gilrs) => gilrs,
+            Err(error) => {
+                eprintln!("Game controllers unavailable: {error}");
+                return;
+            }
+        };
+        loop {
+            while gilrs.next_event().is_some() {}
+            let pad = gilrs.gamepads().find(|(_, pad)| pad.is_connected());
+            let payload = match pad {
+                None => serde_json::json!({ "connected": false }),
+                Some((_, pad)) => {
+                    let trigger = |button| pad.button_data(button).map_or(0.0, |data| data.value());
+                    let battery = match pad.power_info() {
+                        PowerInfo::Discharging(level) | PowerInfo::Charging(level) => Some(level),
+                        _ => None,
+                    };
+                    serde_json::json!({
+                        "connected": true,
+                        "name": pad.name(),
+                        "battery": battery,
+                        "left_x": pad.value(Axis::LeftStickX),
+                        "left_y": pad.value(Axis::LeftStickY),
+                        "right_x": pad.value(Axis::RightStickX),
+                        "right_y": pad.value(Axis::RightStickY),
+                        "left_trigger": trigger(Button::LeftTrigger2),
+                        "right_trigger": trigger(Button::RightTrigger2),
+                        "buttons": {
+                            "a": pad.is_pressed(Button::South),
+                            "b": pad.is_pressed(Button::East),
+                            "x": pad.is_pressed(Button::West),
+                            "y": pad.is_pressed(Button::North),
+                            "lb": pad.is_pressed(Button::LeftTrigger),
+                            "rb": pad.is_pressed(Button::RightTrigger),
+                            "left": pad.is_pressed(Button::DPadLeft),
+                            "right": pad.is_pressed(Button::DPadRight),
+                            "menu": pad.is_pressed(Button::Start),
+                        },
+                    })
+                }
+            };
+            let connected = pad.is_some();
+            let _ = app.emit("gamepad", payload);
+            // Poll fast while a controller is connected; check for one once a second otherwise.
+            thread::sleep(Duration::from_millis(if connected { 16 } else { 1000 }));
+        }
+    });
+}
+
 #[tauri::command]
 fn sidecar_send(line: String, state: State<Sidecar>) -> Result<(), String> {
     let mut guard = state.stdin.lock().unwrap();
@@ -98,6 +155,7 @@ pub fn run() {
         .manage(Sidecar::default())
         .invoke_handler(tauri::generate_handler![sidecar_send])
         .setup(|app| {
+            start_gamepad(app.handle().clone());
             if let Err(message) = start_sidecar(app.handle()) {
                 eprintln!("{message}");
                 let _ = app.emit(
