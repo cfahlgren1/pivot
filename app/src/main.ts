@@ -1,7 +1,7 @@
 // Pivot's setup flow: one instruction and one button per screen, from unboxing to teleoperation.
 import "./style.css";
 import { ArmView, MIDDLE, poseFromJoints, poseFromRaw } from "./arm3d";
-import { call, on } from "./sidecar";
+import { call, on, settled } from "./sidecar";
 
 type Role = "follower" | "leader";
 type Board = { port: string; description: string };
@@ -30,6 +30,7 @@ const state = {
 
 const panel = document.getElementById("panel")!;
 const progress = document.getElementById("progress")!;
+const backButton = document.getElementById("back") as HTMLButtonElement;
 const view = new ArmView(document.getElementById("arm") as HTMLCanvasElement);
 
 // Everything a screen sets up (event listeners, timers) is torn down when the next one shows.
@@ -38,15 +39,28 @@ function onLeave(fn: () => void): void {
   cleanups.push(fn);
 }
 
-function go(step: Step, render: () => void | Promise<void>): void {
+let current: Step = "welcome";
+function go(step: Step): void {
   cleanups.forEach((fn) => fn());
   cleanups = [];
+  current = step;
   const index = STEPS.indexOf(step);
   progress.innerHTML = STEPS.map(
     (_, i) => `<i class="${i < index ? "done" : i === index ? "now" : ""}"></i>`,
   ).join("");
+  backButton.hidden = index === 0;
   view.setGhost(null);
-  void render();
+  void ROUTES[step]();
+}
+
+// Leaving a step runs its cleanups, which cancel calibration or stop teleoperation (keeping the arm stiff).
+async function back(): Promise<void> {
+  const index = STEPS.indexOf(current);
+  if (index === 0 || backButton.disabled) return;
+  backButton.disabled = true;
+  await settled();
+  backButton.disabled = false;
+  go(STEPS[index - 1]);
 }
 
 type Screen = { eyebrow?: string; title: string; lede?: string; body?: string; actions?: string };
@@ -104,7 +118,7 @@ async function welcome(): Promise<void> {
     lede: "Pivot walks you through setup one step at a time, from plugging in to controlling the claw arm with the handle arm. It takes about ten minutes.",
     actions: button("start", "Get started", "primary"),
   });
-  click("start", () => go("connect", connect));
+  click("start", () => go("connect"));
 }
 
 // ── 2. Plug in both boards ──────────────────────────────────────────────────
@@ -131,7 +145,7 @@ async function connect(): Promise<void> {
         `<span class="note">${boards.length === 2 ? "Both boards found." : `Found ${boards.length} of 2.`}</span>`,
     });
     (document.getElementById("next") as HTMLButtonElement).disabled = boards.length !== 2;
-    click("next", () => go("power", power));
+    click("next", () => go("power"));
   };
   await refresh();
   const timer = setInterval(refresh, 1500);
@@ -152,7 +166,7 @@ async function power(): Promise<void> {
       body: failure(error),
       actions: button("retry", "Try again", "primary"),
     });
-    click("retry", () => go("power", power));
+    click("retry", () => go("power"));
     return;
   }
 
@@ -187,8 +201,8 @@ async function power(): Promise<void> {
     body: `<ul class="list">${rows}</ul>${issues}`,
     actions: allReady ? button("next", "Continue", "primary") : button("retry", "Check again", "primary"),
   });
-  click("next", () => go("identify", identify));
-  click("retry", () => go("power", power));
+  click("next", () => go("identify"));
+  click("retry", () => go("power"));
 }
 
 // ── 4. Which arm is which ───────────────────────────────────────────────────
@@ -216,7 +230,7 @@ async function identify(): Promise<void> {
       [state.follower, state.leader] = [state.leader, state.follower];
       render(motion, { follower: state.follower, leader: state.leader });
     });
-    click("next", () => go("follower", () => calibrate("follower")));
+    click("next", () => go("follower"));
   };
 
   let motion: Record<string, number> = {};
@@ -287,7 +301,7 @@ async function calibrate(role: Role): Promise<void> {
   const port = role === "follower" ? state.follower : state.leader;
   const name = ARM_NAMES[role];
   const step = role === "follower" ? "Step 4" : "Step 5";
-  const next = () => (role === "follower" ? go("leader", () => calibrate("leader")) : go("try", tryIt));
+  const next = () => (role === "follower" ? go("leader") : go("try"));
   view.setKind(role);
   view.setPose(MIDDLE);
   onLeave(() => void call("calibrate_cancel"));
@@ -311,9 +325,9 @@ async function calibrate(role: Role): Promise<void> {
           eyebrow: step,
           title: "Couldn’t reach the arm.",
           body: failure(error),
-          actions: button("back", "Try again", "primary"),
+          actions: button("retry", "Try again", "primary"),
         });
-        click("back", prepare);
+        click("retry", prepare);
       }
     });
   };
@@ -490,6 +504,21 @@ async function tryIt(): Promise<void> {
 }
 
 // ── boot ────────────────────────────────────────────────────────────────────
+const ROUTES: Record<Step, () => void | Promise<void>> = {
+  welcome,
+  connect,
+  power,
+  identify,
+  follower: () => calibrate("follower"),
+  leader: () => calibrate("leader"),
+  try: tryIt,
+};
+
+backButton.addEventListener("click", () => void back());
+document.addEventListener("keydown", (event) => {
+  if (event.metaKey && event.key === "[") void back();
+});
+
 on("exited", (data) => {
   screen({
     title: "The hardware helper stopped.",
@@ -504,4 +533,4 @@ if (hello.fake) {
   badge.hidden = false;
   badge.textContent = `Simulated arms · ${hello.scenario}`;
 }
-go("welcome", welcome);
+go("welcome");

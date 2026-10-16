@@ -22,6 +22,11 @@ export async function call<T = any>(method: string, params: Record<string, unkno
   return result;
 }
 
+/** Resolves once no requests are waiting on the sidecar, so a screen can be left without a reply landing on the next one. */
+export async function settled(): Promise<void> {
+  while (pending.size) await new Promise((resolve) => setTimeout(resolve, 50));
+}
+
 await listen<string>("sidecar", ({ payload }) => {
   const message = JSON.parse(payload);
   if (message.event) {

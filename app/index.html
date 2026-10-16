@@ -8,6 +8,19 @@
   <body>
     <div id="app">
       <header class="titlebar" data-tauri-drag-region>
+        <button class="back" id="back" hidden title="Back (⌘[)">
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <path
+              d="M10 3 5 8l5 5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          Back
+        </button>
         <div class="progress" id="progress" data-tauri-drag-region></div>
         <div class="badge" id="badge" hidden></div>
       </header>

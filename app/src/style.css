@@ -78,6 +78,32 @@ button {
   background: var(--blue);
 }
 
+/* Sits just right of the macOS window controls. */
+.back {
+  position: absolute;
+  left: 84px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 0;
+  background: none;
+  padding: 5px 10px 5px 6px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.back:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--ink);
+}
+
+.back[hidden] {
+  display: none;
+}
+
 .badge {
   position: absolute;
   right: 20px;
