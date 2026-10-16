@@ -40,6 +40,10 @@ class Sidecar:
                 return message
             self.events.append(message)
 
+    def notify(self, method: str, **params) -> None:
+        self.proc.stdin.write(json.dumps({"method": method, "params": params}) + "\n")
+        self.proc.stdin.flush()
+
     def wait_for(self, event: str, until, timeout: float = 30) -> dict:
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:

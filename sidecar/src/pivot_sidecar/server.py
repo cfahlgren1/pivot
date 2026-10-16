@@ -4,8 +4,10 @@ Requests (one per line on stdin):   {"id": 1, "method": "probe", "params": {"por
 Responses (stdout):                 {"id": 1, "result": {...}}  or  {"id": 1, "error": {"message": "..."}}
 Events (stdout, unprompted):        {"event": "ranges", "data": {...}}
 
-Only one hardware job (identify, calibration or teleoperation) runs at a time; starting one stops
-the previous one.
+Requests without an id are notifications: they get no response (used for 60 Hz controller input).
+
+Only one hardware job (identify, calibration, teleoperation or replay) runs at a time; starting one
+stops the previous one.
 """
 
 import argparse
@@ -16,14 +18,18 @@ import threading
 import time
 from collections.abc import Callable
 from datetime import datetime
+from pathlib import Path
 
 from pivot_sidecar import __version__
 from pivot_sidecar.calibration import RangeRecorder
 from pivot_sidecar.diagnose import diagnose
+from pivot_sidecar.drive import GamepadSource, LeaderSource
 from pivot_sidecar.fake import FakeArm, FakeBoard, FakeRig
 from pivot_sidecar.hardware import Arm, Board, RealArm, RealBoard, list_boards
 from pivot_sidecar.identify import MotionDetector
 from pivot_sidecar.joints import Role
+from pivot_sidecar.recording import Episode, RecordingStore
+from pivot_sidecar.replay import ReplayLoop
 from pivot_sidecar.teleop import TeleopLoop
 
 SAMPLE_HZ = 60
@@ -60,12 +66,19 @@ class Job:
         self.thread.join(timeout=3)
 
 
+REAL_RECORDINGS = Path.home() / "Library/Application Support/Pivot/recordings"
+
+
 class Server:
     def __init__(self, writer: Writer, rig: FakeRig | None):
         self.writer, self.rig = writer, rig
         self.job: Job | None = None
         self.calibrating: tuple[Arm, RangeRecorder | None] | None = None
         self.teleop: TeleopLoop | None = None
+        self.replay: ReplayLoop | None = None
+        self.store = RecordingStore(rig.calibration_dir / "recordings" if rig else REAL_RECORDINGS)
+        # The episode just recorded, waiting for Keep or Redo: (dataset, episode).
+        self.pending: tuple[str, Episode] | None = None
 
     # ── factories ──────────────────────────────────────────────
     def board(self, port: str) -> Board:
@@ -82,6 +95,9 @@ class Server:
         if self.teleop:
             self.teleop.stop(relax=False)
             self.teleop = None
+        if self.replay:
+            self.replay.stop()
+            self.replay = None
         if self.calibrating:
             self.calibrating[0].disconnect(relax=True)
             self.calibrating = None
@@ -193,21 +209,94 @@ class Server:
         self.stop_everything()
         return {"cancelled": True}
 
-    def teleop_start(self, follower: dict, leader: dict) -> dict:
+    def teleop_start(
+        self, follower: dict, leader: dict | None = None, driver: str = "leader", speed: str = "normal"
+    ) -> dict:
         self.stop_everything()
-        self.teleop = TeleopLoop(
-            self.arm("follower", follower["port"], follower["arm_id"]),
-            self.arm("leader", leader["port"], leader["arm_id"]),
-            self.writer.event,
-        )
+        follower_arm = self.arm("follower", follower["port"], follower["arm_id"])
+        if driver == "leader":
+            if not leader:
+                raise ValueError("Driving with the handle arm needs its port.")
+            source = LeaderSource(self.arm("leader", leader["port"], leader["arm_id"]))
+        elif driver == "gamepad":
+            source = GamepadSource(follower_arm, speed)
+        else:
+            raise ValueError(f"Unknown driver: {driver}")
+        self.teleop = TeleopLoop(follower_arm, source, self.writer.event)
         self.teleop.start()
-        return {"started": True}
+        return {"started": True, "driver": source.name}
+
+    def _gamepad(self) -> GamepadSource:
+        if not self.teleop or not isinstance(self.teleop.source, GamepadSource):
+            raise RuntimeError("Not driving with a controller.")
+        return self.teleop.source
+
+    def teleop_input(self, state: dict) -> dict:
+        # Controller input streams continuously and can arrive just before or after a session; drop it.
+        if self.teleop and isinstance(self.teleop.source, GamepadSource):
+            self.teleop.source.set_input(state)
+        return {}
+
+    def teleop_speed(self, speed: str) -> dict:
+        self._gamepad().set_speed(speed)
+        return {"speed": speed}
 
     def teleop_stop(self, relax: bool = False) -> dict:
         if self.teleop:
             self.teleop.stop(relax=relax)
             self.teleop = None
         return {"stopped": True, "relaxed": relax}
+
+    def record_start(self, dataset: str, task: str) -> dict:
+        if not self.teleop:
+            raise RuntimeError("Start driving the arm before recording.")
+        self.pending = None
+        self.teleop.start_recording(task)
+        return {"recording": True, "dataset": dataset}
+
+    def record_stop(self, dataset: str) -> dict:
+        if not self.teleop:
+            raise RuntimeError("Not driving the arm.")
+        episode = self.teleop.stop_recording()
+        self.pending = (dataset, episode)
+        return {**episode.summary(), "preview": episode.preview()}
+
+    def record_save(self) -> dict:
+        if not self.pending:
+            raise RuntimeError("Nothing to save.")
+        dataset, episode = self.pending
+        self.pending = None
+        index = self.store.save(dataset, episode)
+        return {"index": index}
+
+    def record_discard(self) -> dict:
+        self.pending = None
+        return {"discarded": True}
+
+    def recordings_list(self) -> dict:
+        return {"datasets": self.store.list(), "root": str(self.store.root)}
+
+    def recording_get(self, dataset: str, index: int) -> dict:
+        episode = self.store.load(dataset, index)
+        return {**episode.summary(), "preview": episode.preview()}
+
+    def recording_delete(self, dataset: str, index: int) -> dict:
+        self.store.delete(dataset, index)
+        return {"deleted": True}
+
+    def replay_start(self, follower: dict, dataset: str, index: int, speed: float = 0.5) -> dict:
+        self.stop_everything()
+        episode = self.store.load(dataset, index)
+        arm = self.arm("follower", follower["port"], follower["arm_id"])
+        self.replay = ReplayLoop(arm, episode, self.writer.event, speed)
+        self.replay.start()
+        return {"started": True, "duration": episode.duration}
+
+    def replay_stop(self) -> dict:
+        if self.replay:
+            self.replay.stop()
+            self.replay = None
+        return {"stopped": True}
 
     # ── dispatch ───────────────────────────────────────────────
     METHODS = {
@@ -222,7 +311,18 @@ class Server:
         "calibrate_finish",
         "calibrate_cancel",
         "teleop_start",
+        "teleop_input",
+        "teleop_speed",
         "teleop_stop",
+        "record_start",
+        "record_stop",
+        "record_save",
+        "record_discard",
+        "recordings_list",
+        "recording_get",
+        "recording_delete",
+        "replay_start",
+        "replay_stop",
     }
 
     def handle(self, request: dict) -> None:
@@ -232,7 +332,8 @@ class Server:
             return
         try:
             result = getattr(self, method)(**request.get("params", {}))
-            self.writer.send({"id": request_id, "result": result})
+            if request_id is not None:
+                self.writer.send({"id": request_id, "result": result})
         except Exception as exc:
             logging.exception("%s failed", method)
             self.writer.send({"id": request_id, "error": {"message": str(exc), "type": type(exc).__name__}})

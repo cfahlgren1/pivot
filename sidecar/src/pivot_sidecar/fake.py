@@ -151,3 +151,6 @@ class FakeArm:
 
     def send_joints(self, joints: dict[str, float]) -> None:
         self._commanded = dict(joints)
+
+    def joint_limits(self) -> dict[str, tuple[float, float]]:
+        return {joint: (0.0, 100.0) if joint == "gripper" else (-100.0, 100.0) for joint in JOINTS}

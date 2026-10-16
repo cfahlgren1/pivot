@@ -62,6 +62,7 @@ class Arm(Protocol):
     def save_calibration(self, mins: dict[str, int], maxes: dict[str, int]) -> Path: ...
     def read_joints(self) -> dict[str, float]: ...
     def send_joints(self, joints: dict[str, float]) -> None: ...
+    def joint_limits(self) -> dict[str, tuple[float, float]]: ...
 
 
 class RealBoard:
@@ -175,3 +176,17 @@ class RealArm:
 
     def send_joints(self, joints: dict[str, float]) -> None:
         self._device.send_action({f"{joint}.pos": value for joint, value in joints.items()})
+
+    def joint_limits(self) -> dict[str, tuple[float, float]]:
+        """Each joint's calibrated range in LeRobot's units: degrees from the middle, gripper 0-100.
+
+        LeRobot doesn't clamp degree targets, so anything that generates targets must stay inside these.
+        """
+        limits = {}
+        for joint, calibration in self._device.calibration.items():
+            if joint == "gripper":
+                limits[joint] = (0.0, 100.0)
+                continue
+            half = (calibration.range_max - calibration.range_min) / 2 * 360 / 4095
+            limits[joint] = (-half, half)
+        return limits
